@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261008233757";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261008234702";
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <title>Bony Health</title>
@@ -478,7 +478,7 @@ const LIVE=typeof BH_API!=='undefined';
 let BOOT=null;if(LIVE){try{BOOT=JSON.parse(localStorage.getItem('bh_boot')||'null')}catch(e){}}
 // Món Gemini thêm / alias mới trên Sheet: ghép vào từ điển trước khi dựng FOODS
 if(BOOT&&BOOT.foods)for(const o of BOOT.foods){if(!o||!o.id||o.active===false||o.active==='FALSE')continue;
-  const row=RAW.cols.map((c,i)=>{const v=o[c];if(v===undefined||v===null)return '';return typeof RAW.rows[0][i]==='number'&&v!==''?+v:v});
+  const row=RAW.cols.map((c,i)=>{const v=Array.isArray(o[c])?o[c].join('|'):o[c];if(v===undefined||v===null)return '';return typeof RAW.rows[0][i]==='number'&&v!==''?+v:v});
   const j=RAW.rows.findIndex(r=>r[0]===o.id);if(j>=0)RAW.rows[j]=row;else RAW.rows.push(row)}
 const $=s=>document.querySelector(s);
 const fmt=n=>Math.round(n||0).toLocaleString('en-US');
@@ -957,7 +957,7 @@ function itemLevel(v){return v.sodium_mg>900||(hasC('Gout')&&v.purine_mg>200)||v
 const enName=f=>f&&f.name_en?f.name_en.replace(/\s*\(.*?\)/,''):'';
 const nameHTML=f=>`<span class="cn"><span>${esc(f.name.replace(/\s*\(.*?\)/,''))}</span>${enName(f)?`<small class="en">${esc(enName(f))}</small>`:''}</span>`;
 function chipHTML(ref,it){
-  if(!it.fid)return `<button class="chip unknown" data-ref="${ref}"><span class="fi">?</span>${esc(it.name)}</button>`;
+  if(!it.fid)return `<button class="chip unknown" data-ref="${ref}"><span class="fi">${it.looking?'…':'?'}</span>${esc(it.name)}${it.looking?'<span class="sz">Looking up…</span>':''}</button>`;
   const f=FOOD[it.fid],v=itemVals(it),nm=nameHTML(f);
   if(it.guess)return `<button class="chip guess" data-ref="${ref}" title="Best guess, tap to confirm"><span class="fi ${itemLevel(v)}">${svg(iconKey(f))}</span>${nm}<span class="q">?</span></button>`;
   const sg=it.sugar!=null&&it.sugar!==100&&sugarAdj(f)?`<span class="sz">${it.sugar}% sugar</span>`:'';
@@ -1171,6 +1171,7 @@ $('#composer').addEventListener('submit',ev=>{ev.preventDefault();const v=$('#sa
   settleHabits();p.items=p.items.map(autoGuess).map(applyHabits);
   const e=addMeal(vt,nowT(),new Date().getHours(),p);e.user=true;state.pick=null;
   if(yb){e.date=isoD(yday());addToHist(e)}
+  lookupUnknown(e);
   state.undo=()=>{state.entries=state.entries.filter(x=>x!==e)};renderAll();
   showToast('Saved · '+e.items.map(it=>it.fid?shortName(FOOD[it.fid]):it.name).join(', '))});
 /* Món không có trong từ điển → tự chọn món gần nhất (có chữ chung), để dấu ? nhỏ cho sửa sau. */
@@ -1178,6 +1179,16 @@ function autoGuess(it){if(it.fid||!it.name)return it;const q=norm(it.name),w=q.s
   const c=nearest(q,3).find(f=>f.al.concat([norm(shortName(f))]).some(a=>w.some(x=>(' '+a+' ').includes(' '+x+' '))));
   return c?withParts({...it,fid:c.id,guess:true}):it}
 /* Thói quen chỉ ghi nhận khi card đã "ổn định" (lúc nhập món tiếp theo), để tính cả các lần sửa sau khi lưu. */
+function addFoodLive(o){if(!o||!o.id)return null;if(FOOD[o.id])return FOOD[o.id];
+  const L=v=>Array.isArray(v)?v:String(v||'').split('|').map(x=>x.trim()).filter(Boolean),f={};
+  RAW.cols.forEach(c=>{const v=o[c];f[c]=Array.isArray(v)?v.join('|'):(v==null?'':v)});f.al=L(o.aliases);f.groups=L(o.groups);f.tags=L(o.tags);
+  FOODS.push(f);FOOD[f.id]=f;f.al.forEach(a=>{if(!ALIAS.has(a))ALIAS.set(a,f)});return f}
+async function lookupUnknown(e){if(!LIVE)return;
+  for(const it of e.items){if(it.fid||it.kept||!it.name||it.looking)continue;it.looking=true;renderAll(false);
+    try{const j=await api('estimateFood',{name:it.name}),f=addFoodLive(j.food);
+      if(f&&e.items.includes(it)){const nw=withParts({fid:f.id,qty:it.qty,size:it.size||'M',guess:true,name:it.name});delete it.looking;Object.assign(it,nw);
+        renderAll(false);showToast(`Gemini estimated “${shortName(f)}” · tap ? to confirm`,false)}}
+    catch(err){delete it.looking;renderAll(false)}}}
 function addToHist(e){const t=yday().getTime();let d=HIST.find(h=>h.date.getTime()===t);
   if(!d){d={date:yday(),items:[],water:0};HIST.push(d);HIST.sort((a,b)=>a.date-b.date)}
   d.items.push(...e.items.filter(it=>it.fid).map(it=>({...it,meal:e.meal})))}
