@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261008234702";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009000336";
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <title>Bony Health</title>
@@ -145,6 +145,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .menu-row .mi svg{width:17px;height:17px}
 .menu-row .t{font-size:11px;color:var(--faint);font-weight:600;letter-spacing:.05em;text-transform:uppercase;display:flex;gap:6px;align-items:center}
 .mlist{display:grid}
+.mw.warn{color:var(--amber)!important}.mw.wrap{white-space:normal;color:var(--muted)}
 .mrow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border-top:1px solid var(--line);padding:8px 0}
 .mrow:first-child{border-top:0;padding-top:2px}
 .mhead{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;text-align:left;min-width:0}
@@ -889,11 +890,16 @@ const HOME=[
   {n:'Ức gà luộc · salad · khoai lang',ids:['uc_ga_luoc','salad_tron','khoai_lang_luoc'],how:'Boil chicken breast 15 min, shred into salad; boiled sweet potato instead of rice.'},
   {n:'Đậu hũ sốt cà · canh rau ngót',ids:['dau_hu_sot_ca','canh_rau_ngot','com_gao_lut_chen'],how:'Pan-sear tofu with little oil, then tomato sauce; lightly salted katuk soup.'},
   {n:'Cá kho tộ · canh bí · rau luộc',ids:['ca_kho_to','canh_bi','bap_cai_luoc','com_trang_chen'],how:'Braise fish on low heat, less salty than usual; serve with boiled greens.'},
+  {n:'Thịt nạc luộc · rau luộc · gạo lứt',ids:['thit_heo_lat','rau_luoc','com_gao_lut_chen'],how:'Boil lean pork slices 10 min, boil greens; dip in lime-pepper instead of fish sauce.'},
+  {n:'Gà xé · dưa leo · rau sống · gạo lứt',ids:['ga_xe','dua_leo','rau_song','com_gao_lut_chen'],how:'Shred boiled chicken (skinless), toss with herbs and a squeeze of lime.'},
+  {n:'Trứng luộc · cà chua · rau luộc · gạo lứt',ids:['trung_luoc','ca_chua','rau_luoc','com_gao_lut_chen'],q:{trung_luoc:2},how:'2 boiled eggs, sliced tomato, boiled greens; eggs are a low-purine protein.'},
+  {n:'Đậu hũ áp chảo · nấm · rau luộc · gạo lứt',ids:['dau_hu_chien','nam_rom','rau_luoc','com_gao_lut_chen'],how:'Pan-sear tofu with a little oil, stir in mushrooms; boiled greens on the side.'},
 ].map(h=>({...h,ids:ids(h.ids)})).filter(h=>h.ids.length);
 const HOME_B=[
   {n:'Yến mạch sữa · chuối',ids:['yen_mach','sua_tuoi_khong_duong_180','chuoi'],how:'Cook oats 3 min with unsweetened milk, add half a banana.'},
   {n:'Trứng luộc · bánh mì sandwich · ổi',ids:['trung_ga_luoc','banh_mi_sandwich','oi'],how:'Boil 2 eggs for 8 min, 2 slices of bread, 1 guava.'},
   {n:'Khoai lang luộc · sữa chua không đường',ids:['khoai_lang_luoc','sua_chua_khong_duong'],how:'Boil sweet potato 20 min; add 1 cup of yogurt.'},
+  {n:'Trứng luộc · khoai lang · dưa leo',ids:['trung_luoc','khoai_lang_luoc','dua_leo'],q:{trung_luoc:2},how:'2 boiled eggs, 1 small sweet potato, cucumber slices.'},
 ].map(h=>({...h,ids:ids(h.ids)})).filter(h=>h.ids.length);
 const QUAN={
   'Dinner':[['com_van_phong_ca'],['canh_chua_ca','com_trang_chen'],['bun_ca'],['chao_ca'],['goi_cuon','canh_rau_ngot'],['com_ga_hai_nam','canh_rau_ngot'],['pho_ga']],
@@ -902,29 +908,74 @@ const QUAN={
 };
 const TIPS=[[/^pho|^bun|^hu_tieu|^mi_|^banh_canh/,'drink less broth'],[/^com_tam/,'skip pork skin and egg cake; add veggies'],[/com_van_phong/,'ask for extra veggies, less fish sauce'],[/banh_mi/,'less pâté, more cucumber'],[/^xoi/,'half a portion of sticky rice']];
 const tipFor=list=>{for(const id of list)for(const [re,t] of TIPS)if(re.test(id))return t;return ''};
-function scoreCombo(list,gp){
-  const v=sumItems(list.map(id=>({fid:id,qty:1,size:'M'})));const grp=new Set(list.flatMap(id=>FOOD[id].groups));
-  let s=0;for(const x of gp.slice(0,4))if(grp.has(x.key)||(x.key==='fiber_g'&&v.fiber_g>=6)||(x.key==='omega3_g'&&grp.has('ca'))||(x.key==='vitc_mg'&&v.vitc_mg>30)||(x.key==='calcium_mg'&&v.calcium_mg>200))s+=10;
-  if(hasC('High blood pressure'))s-=v.sodium_mg/250;if(hasC('Gout'))s-=v.purine_mg/80;s-=v.sugar_g/6;s-=Math.max(0,v.kcal-700)/60;
-  return {s,v,grp};
-}
-function reasonFor(list,gp){
-  const grp=new Set(list.flatMap(id=>FOOD[id].groups)),v=sumItems(list.map(id=>({fid:id,qty:1,size:'M'})));const r=[];
-  for(const x of gp)if(grp.has(x.key)||(x.key==='fiber_g'&&v.fiber_g>=6)||(x.key==='omega3_g'&&grp.has('ca'))||(x.key==='vitc_mg'&&v.vitc_mg>30))r.push(x.n.toLowerCase());
-  return r.length?'Adds '+r.slice(0,2).join(', '):(v.sodium_mg<900?'Low sodium':'Balanced');
-}
+/* ---------- Bộ gợi ý món (làm lại 09/10/2026): lọc theo bệnh nền trước, xếp hạng sau ----------
+   Mỗi bữa có ngân sách = phần của bữa trong hạn mức ngày (sáng 25%, trưa 35%, tối 30%, phụ 10%), trừ phần đã ăn hôm nay.
+   Giới hạn: natri (AHA: 1.500 mg/ngày khi có huyết áp), purin (gout: 400 mg/ngày, tránh nội tạng/hải sản có vỏ),
+   đường tự do (WHO/ADA: 5% calo khi tiền tiểu đường; đường trong trái cây, sữa không đường không tính), béo bão hoà (<7% calo khi mỡ máu).
+   Đủ: rau ½ đĩa ~150 g (Plate Method ADA/Harvard), đạm, xơ. Món quán được thử thêm cách gọi "bỏ phần lớn nước dùng / chấm ít". */
+const SHARE={Breakfast:.25,Lunch:.35,Dinner:.3,Snack:.1,'Late night':.1};
+const SIDES=ids(['rau_luoc','bap_cai_luoc','dua_leo','salad_tron','rau_muong_xao_toi','canh_rau_ngot']),SOUP_SIDES=ids(['gia','rau_song']);
+function sidesFor(c,meal){if(meal==='Breakfast')return [];const cats=c.ids.map(id=>FOOD[id].category);
+  if(cats.includes('mon_nuoc'))return SOUP_SIDES;if(c.src==='nau'||cats.some(x=>['com','mon_kho','mon_man','chao'].includes(x)))return SIDES;return ids(['dua_leo'])}
 const MODE_DEF={'Breakfast':'quan','Lunch':'quan','Dinner':'nau'};
 function loadModes(){try{return {...MODE_DEF,...JSON.parse(localStorage.getItem('bh_menu_mode')||'{}')}}catch(e){return {...MODE_DEF}}}
-function buildMenu(){
-  const gp=gaps(analyse(7)),out={};
-  for(const m of ['Breakfast','Lunch','Dinner']){
-    const q=QUAN[m].map(ids).filter(a=>a.length).map(l=>({l,...scoreCombo(l,gp)})).sort((a,b)=>b.s-a.s);
-    const home=(m==='Breakfast'?HOME_B:HOME).map(x=>({x,...scoreCombo(x.ids,gp)})).sort((a,b)=>b.s-a.s);
-    out[m]={quan:q.slice(0,2).map(x=>({ids:x.l,name:x.l.map(id=>FOOD[id].name).join(' + '),kcal:x.v.kcal,why:reasonFor(x.l,gp),tip:tipFor(x.l),src:'quan'})),
-            nau:home.slice(0,2).map(o=>({ids:o.x.ids,name:o.x.n,kcal:o.v.kcal,why:reasonFor(o.x.ids,gp),tip:o.x.how,src:'nau'}))};
-  }
-  return {gp,meals:out,mode:loadModes(),pickIdx:{'Breakfast':0,'Lunch':0,'Dinner':0},done:{}};
-}
+const enoughHist=()=>HIST.filter(h=>h.date>=new Date(today-7*864e5)).length>=3;
+function recentIds(n){const from=new Date(today-n*864e5),s=new Set();HIST.filter(h=>h.date>=from).forEach(h=>h.items.forEach(it=>s.add(it.fid)));todayItems().forEach(it=>s.add(it.fid));return s}
+function mealBudget(meal,useToday){
+  const sh=SHARE[meal]||.3,main=sh>=.25,t=useToday?totals():{kcal:0,sodium_mg:0,purine_mg:0,sugar_g:0,satfat_g:0};
+  const left=(day,used,min)=>Math.max(min,Math.min(sh*day*1.15,day-used));
+  return {sh,main,kcal:Math.max(main?250:100,Math.min(sh*T.kcal,T.kcal-t.kcal)),na:left(T.naGood,t.sodium_mg,main?250:100),
+    pu:hasC('Gout')?left(T.pu,t.purine_mg,main?60:20):Infinity,su:left(T.su,t.sugar_g,main?3:2),sat:left(T.sat,t.satfat_g,main?2:1),
+    veg:main?(meal==='Breakfast'?60:150):0,pro:main?T.pro*sh*.85:0,fib:main?T.fib*sh*.7:0}}
+const freeSugarOf=items=>sumItems(items.filter(it=>{const f=FOOD[it.fid];return !(f.groups.includes('trai_cay')||/khong_duong/.test(it.fid))})).sugar_g;
+function evalOpt(items,B){const v=sumItems(items),fails=[],goods=[];let pen=0;
+  const over=(x,cap,lbl,u,w)=>{if(x>cap){pen+=(x-cap)/cap*w;if(x>cap*1.1)fails.push(`${lbl} ${fmt(x)}${u} (limit ${fmt(cap)}${u})`)}};
+  over(v.sodium_mg,B.na,'Sodium',' mg',60);if(B.pu<Infinity)over(v.purine_mg,B.pu,'Purine',' mg',60);
+  over(freeSugarOf(items),B.su,'Sugar',' g',hasC('Prediabetes')?50:30);over(v.satfat_g,B.sat,'Saturated fat',' g',hasC('High cholesterol')?40:20);
+  pen+=Math.max(0,v.kcal-B.kcal*1.15)/B.kcal*50+Math.max(0,B.kcal*.55-v.kcal)/B.kcal*20;
+  const need=(x,goal,w,lbl)=>{if(!goal)return;const r=Math.min(1,x/goal);pen+=(1-r)*w;if(r>=1)goods.push(lbl)};
+  need(v.veg_g,B.veg,15,B.veg>=150?'½ plate veg':'some veg');need(v.protein_g,B.pro,12,fmt(v.protein_g)+' g protein');
+  need(v.fiber_g,B.fib,hasC('Prediabetes')||hasC('High cholesterol')?12:8,fmt(v.fiber_g)+' g fiber');
+  if(hasC('Gout')&&items.some(it=>['noi_tang','hai_san_vo'].some(t=>FOOD[it.fid].tags.includes(t)))){pen+=100;fails.unshift('Organ meat / shellfish (gout)')}
+  return {v,pen,fails,goods}}
+function variants(list){
+  const base=list.map(id=>withParts({fid:id,qty:1,size:'M'})),out=[{items:base,tip:tipFor(list)}],lite=JSON.parse(JSON.stringify(base)),ch=new Set();
+  lite.forEach(it=>{(it.parts||[]).forEach(p=>{if(p.hid&&/nuoc_dung/.test(p.fid)){p.qty=.3;ch.add('broth')}if(/nuoc_mam|nuoc_cham|mam_tom/.test(p.fid)){p.qty=.4;ch.add('sauce')}});
+    if(/nuoc_mam_pha|nuoc_cham/.test(it.fid)){it.qty=.4;ch.add('sauce')}});
+  if(ch.size)out.push({items:lite,lite:true,tip:[ch.has('broth')?'leave most of the broth (it holds most of the salt)':'',ch.has('sauce')?'use only a little dipping sauce':''].filter(Boolean).join('; ')});
+  return out}
+function candidates(meal,mode){const C=[];
+  if(!((SHARE[meal]||.3)>=.25)){SNACKS.map(ids).filter(a=>a.length).forEach(l=>C.push({src:'snack',ids:l,items:l.map(id=>({fid:id,qty:1,size:'M'})),tip:''}));return C}
+  if(mode!=='nau'){const pool=QUAN[meal==='Drinks'?'Lunch':meal].map(ids).filter(a=>a.length),m={};
+    // Món Bony hay ăn ở bữa này (60 ngày) cũng được xét, kèm cách gọi tốt hơn
+    HIST.slice(-60).forEach(d=>d.items.forEach(it=>{const f=it.fid&&FOOD[it.fid];if(f&&it.meal===meal&&BASE_CAT.has(f.category)&&+f.kcal>=250&&!/^com_trang|gao_lut|sandwich/.test(it.fid))m[it.fid]=(m[it.fid]||0)+1}));
+    Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,6).forEach(([id])=>{if(!pool.some(l=>l.length===1&&l[0]===id))pool.push([id])});
+    pool.forEach(l=>variants(l).forEach(v=>C.push({src:'quan',ids:l,items:v.items,tip:v.tip,lite:v.lite,fav:l.length===1&&!!m[l[0]]})))}
+  if(mode!=='quan')(meal==='Breakfast'?HOME_B:HOME).forEach(h=>{const items=h.ids.map(id=>({fid:id,qty:(h.q&&h.q[id])||1,size:'M'}));
+    C.push({src:'nau',ids:h.ids,name:h.n,items,tip:h.how});
+    // Gout: thử phần đạm nhỏ hơn (~70%) — vẫn đủ đạm cho bữa nhưng ít purin hơn
+    if(hasC('Gout')){const sm=items.map(it=>{const f=FOOD[it.fid];return +f.purine_mg>=60&&(f.groups.includes('dam_nac')||f.groups.includes('ca')||f.category==='tp_dam')?{...it,qty:it.qty*.7}:it});
+      if(sm.some((x,i)=>x!==items[i]))C.push({src:'nau',ids:h.ids,name:h.n,items:sm,tip:h.how+' Keep the meat or fish to a palm-sized portion (~70 g).'})}});
+  return C}
+function rankMeal(meal,mode,useToday,exclude=new Set()){
+  const B=mealBudget(meal,useToday),gp=enoughHist()?gaps(analyse(7)):[],recent=recentIds(2),by=new Map();
+  for(const c of candidates(meal,mode)){if(c.ids.some(id=>exclude.has(id)))continue;let o={...c,...evalOpt(c.items,B)};
+    if(B.veg&&o.v.veg_g<B.veg*.8){let best=null;
+      for(const sd of sidesFor(c,meal)){if(c.ids.includes(sd))continue;const its=[...c.items,{fid:sd,qty:1,size:'M'}],e=evalOpt(its,B);if(!best||e.pen<best.e.pen)best={sd,its,e}}
+      if(best&&best.e.pen<o.pen)o={...o,...best.e,items:best.its,side:best.sd}}
+    let sc=-o.pen;const grp=new Set(o.items.flatMap(it=>FOOD[it.fid].groups));for(const x of gp.slice(0,3))if(grp.has(x.key))sc+=4;
+    if(o.fav)sc+=3;if(c.ids.some(id=>recent.has(id)&&BASE_CAT.has(FOOD[id].category)))sc-=6;
+    o.sc=sc;o.kcal=o.v.kcal;o.name=(c.name||c.ids.map(id=>shortName(FOOD[id])).join(' + '))+(o.side?' + '+shortName(FOOD[o.side]):'');
+    o.tip=[c.tip,o.side?(SOUP_SIDES.includes(o.side)?'ask for extra '+shortName(FOOD[o.side]).toLowerCase():'add a side of '+shortName(FOOD[o.side]).toLowerCase()):''].filter(Boolean).join('; ');
+    o.why=o.fails.length?'Over: '+o.fails[0]:(o.goods.slice(0,2).join(' · ')||'Within your limits');
+    const k=o.src+':'+c.ids.join('+');if(!by.has(k)||by.get(k).sc<o.sc)by.set(k,o)}
+  return {B,list:[...by.values()].sort((a,b)=>b.sc-a.sc)}}
+const condFocus=()=>[hasC('High blood pressure')&&'low sodium',hasC('Gout')&&'low purine',hasC('Prediabetes')&&'more fiber, less sugar',hasC('High cholesterol')&&'less saturated fat'].filter(Boolean);
+const LIMIT_SRC='Limits: sodium AHA · purine Japanese gout guideline · sugar WHO/ADA · plate ADA/Harvard. Not a prescription; your doctor’s limits come first.';
+function buildMenu(){const gp=enoughHist()?gaps(analyse(7)):[],out={},used=new Set(),modes=loadModes();
+  for(const m of ['Breakfast','Lunch','Dinner']){out[m]={quan:rankMeal(m,'quan',false,used).list.slice(0,3),nau:rankMeal(m,'nau',false,used).list.slice(0,3)};
+    const top=out[m][modes[m]][0];if(top)top.ids.forEach(id=>{if(BASE_CAT.has(FOOD[id].category))used.add(id)})}
+  return {gp,meals:out,mode:modes,pickIdx:{'Breakfast':0,'Lunch':0,'Dinner':0},done:{}}}
 const curPick=meal=>{const m=state.menu,list=m.meals[meal][m.mode[meal]];return list[m.pickIdx[meal]%list.length]};
 
 /* ---------- render: hero ---------- */
@@ -1011,22 +1062,22 @@ function comment(e,t,gp){
 function menuCard(){
   const m=state.menu;m.open=m.open||{};
   const rows=['Breakfast','Lunch','Dinner'].map(meal=>{const o=curPick(meal),done=m.done[meal],md=m.mode[meal],open=m.open[meal];
-    const v=sumItems(o.ids.map(id=>({fid:id,qty:1,size:'M'}))),short=o.why;
+    const v=o.v,short=o.why;
     return `<div class="mrow${open?' open':''}${done?' done':''}">
       <button class="mhead" data-open="${meal}" aria-expanded="${!!open}">
         <span class="mi ${md}">${svg(iconKey(FOOD[o.ids[0]]),16)}</span>
         <span class="mtxt"><span class="mt">${meal}<span class="dotsep">·</span>${md==='quan'?'Eat out':'Cook'}</span>
-          <span class="mn">${esc(o.name)}</span><span class="mw num">${esc(short)} · ${fmt(o.kcal)} kcal</span></span>
+          <span class="mn">${esc(o.name)}</span><span class="mw num${o.fails.length?' warn':''}">${esc(short)} · ${fmt(o.kcal)} kcal</span></span>
       </button>
       ${done?`<span class="eat done" aria-label="Logged">${svg('check',16)}</span>`:`<button class="eat" data-eat="${meal}" aria-label="Eat this: ${esc(o.name)}">${svg('check',16)}</button>`}
       ${open?`<div class="mdetail">
         <div class="mode" role="group" aria-label="Eat out or cook">${[['quan','Eat out'],['nau','Cook']].map(([k,l])=>`<button data-mode="${k}" data-meal="${meal}" aria-pressed="${md===k}">${l}</button>`).join('')}</div>
         ${o.tip?`<p><b>${o.src==='quan'?'How to order':'How to cook'}:</b> ${esc(o.tip)}</p>`:''}
-        <p class="num">≈ ${fmt(o.kcal)} kcal · sodium ${fmt(v.sodium_mg)} mg · sugar ${fmt(v.sugar_g)} g · protein ${fmt(v.protein_g)} g</p>
+        <p class="num">≈ ${fmt(o.kcal)} kcal · sodium ${fmt(v.sodium_mg)} mg${hasC('Gout')?` · purine ${fmt(v.purine_mg)} mg`:''} · fiber ${fmt(v.fiber_g)} g · protein ${fmt(v.protein_g)} g · veg ${fmt(v.veg_g)} g</p>
         <div class="mact"><button class="linkbtn" data-swap="${meal}">Swap dish</button>${done?'':`<button class="btn-s" data-eat="${meal}">Eat this</button>`}</div></div>`:''}
     </div>`}).join('');
-  const gp=m.gp.slice(0,3).map(x=>x.n.toLowerCase()).join(', ');
-  return `<div class="card"><h5>Meal ideas for today<small>Tap a meal for details</small></h5>${gp?`<div class="foods">Focus on: <b>${gp}</b></div>`:''}<div class="mlist">${rows}</div></div>`;
+  const gp=(m.gp.length?m.gp.slice(0,3).map(x=>x.n.toLowerCase()):condFocus()).join(', ');
+  return `<div class="card"><h5>Meal ideas for today<small>Tap a meal for details</small></h5>${gp?`<div class="foods">Focus on: <b>${gp}</b></div>`:''}<div class="mlist">${rows}</div><div class="why-src" style="margin:6px 0 0">${LIMIT_SRC}</div></div>`;
 }
 function reportCard(){
   const a=analyse(7),gp=gaps(a).slice(0,3),su=a.src.sugar_g.list[0],ts=a.tag.tra_sua,prev=analyse(7,7).tag.tra_sua;
@@ -1047,37 +1098,27 @@ function answerCard(q){
    Luật cố định, không dùng AI: còn bao nhiêu calo/natri/đường hôm nay + nhóm thiếu trong tuần + món hay ăn. */
 const SNACKS=[['chuoi'],['oi'],['cam'],['thanh_long'],['sua_chua_khong_duong'],['khoai_lang_luoc'],['hat_dieu'],['sua_tuoi_khong_duong_180'],['yen_mach','sua_tuoi_khong_duong_180']];
 function suggList(meal,mode){
-  const t=totals(),rk=T.kcal-t.kcal,rn=T.na-t.sodium_mg,rs=T.su-t.sugar_g,gp=gaps(analyse(7)),light=meal==='Snack'||meal==='Late night',pool=[];
-  const nm=l=>l.map(id=>shortName(FOOD[id])).join(' + ');
-  if(light)SNACKS.map(ids).filter(a=>a.length).forEach(l=>pool.push({l,src:'snack',name:nm(l),tip:''}));
-  else{
-    if(mode!=='nau')QUAN[meal==='Drinks'?'Lunch':meal].map(ids).filter(a=>a.length).forEach(l=>pool.push({l,src:'quan',name:nm(l),tip:tipFor(l)}));
-    if(mode!=='quan')(meal==='Breakfast'?HOME_B:HOME).forEach(h=>pool.push({l:h.ids,src:'nau',name:h.n,tip:h.how}));
-    // Món Bony hay ăn ở bữa này (60 ngày gần nhất) cũng được đề xuất, kèm cách gọi cho tốt hơn
-    if(mode!=='nau'){const m={};HIST.slice(-60).forEach(d=>d.items.forEach(it=>{const f=it.fid&&FOOD[it.fid];if(f&&it.meal===meal&&BASE_CAT.has(f.category)&&+f.kcal>=250&&!/^com_trang|gao_lut|sandwich/.test(it.fid))m[it.fid]=(m[it.fid]||0)+1}));
-      Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,6).forEach(([id])=>{if(!pool.some(p=>p.l.length===1&&p.l[0]===id))pool.push({l:[id],src:'quan',name:shortName(FOOD[id]),tip:tipFor([id]),fav:true})})}
-  }
-  const out=pool.map(o=>{const c=scoreCombo(o.l,gp),v=c.v;let sc=c.s;
-    sc-=Math.max(0,v.kcal-Math.max(rk,light?150:350))/40;sc-=Math.max(0,v.sodium_mg-Math.max(rn,300))/120;sc-=Math.max(0,v.sugar_g-Math.max(rs,5))/4;if(o.fav)sc+=3;
-    return {...o,v,sc,why:o.fav?'You often have this':reasonFor(o.l,gp)}}).sort((a,b)=>b.sc-a.sc);
-  // Xen kẽ quán / nấu để 3 gợi ý đầu có cả hai
-  if(light||mode)return out;
-  const q=out.filter(o=>o.src==='quan'),h=out.filter(o=>o.src==='nau'),mix=[];
+  const {B,list}=rankMeal(meal,mode,true);
+  if(mode||!B.main)return {B,list};
+  const q=list.filter(o=>o.src==='quan'),h=list.filter(o=>o.src==='nau'),mix=[];
   while(q.length||h.length){if(q.length)mix.push(q.shift());if(h.length)mix.push(h.shift());if(q.length)mix.push(q.shift())}
-  return mix}
+  return {B,list:mix}}
 function suggCard(e){
-  const t=totals(),rk=Math.max(0,T.kcal-t.kcal),rn=Math.max(0,T.na-t.sodium_mg),L=suggList(e.meal,e.mode),n=L.length,st=(e.off*3)%Math.max(1,n);
+  const {B,list:L}=suggList(e.meal,e.mode),n=L.length,st=(e.off*3)%Math.max(1,n);
   e.shown=[0,1,2].map(i=>L[(st+i)%n]).filter((o,i,a)=>o&&a.indexOf(o)===i);e.done=e.done||{};
   const rows=e.shown.map((o,i)=>`<div class="mrow open${e.done[o.name]?' done':''}"><div class="mhead">
-      <span class="mi ${o.src==='nau'?'nau':'quan'}">${svg(iconKey(FOOD[o.l[0]]),16)}</span>
+      <span class="mi ${o.src==='nau'?'nau':'quan'}">${svg(iconKey(FOOD[o.ids[0]]),16)}</span>
       <span class="mtxt"><span class="mt">${o.src==='nau'?'Cook':o.src==='snack'?'Light bite':'Eat out'}</span><span class="mn">${esc(o.name)}</span>
-        <span class="mw num">${esc(o.why)} · ${fmt(o.v.kcal)} kcal</span></span></div>
+        <span class="mw num${o.fails.length?' warn':''}">${esc(o.why)}</span>
+        <span class="mw num wrap">${fmt(o.v.kcal)} kcal · sodium ${fmt(o.v.sodium_mg)} mg${B.pu<Infinity?` · purine ${fmt(o.v.purine_mg)} mg`:''}</span></span></div>
       ${e.done[o.name]?`<span class="eat done" aria-label="Logged">${svg('check',16)}</span>`:`<button class="eat" data-seat="${e.id}|${i}" aria-label="Eat this: ${esc(o.name)}">${svg('check',16)}</button>`}
       ${o.tip?`<div class="mdetail"><p><b>${o.src==='nau'?'How to cook':'How to order'}:</b> ${esc(o.tip)}</p></div>`:''}</div>`).join('');
-  const head=rk<250?'You are close to today’s calorie target, so these are light.':`About ${fmt(rk)} kcal and ${fmt(rn)} mg sodium left for today.`;
+  const lbl=e.meal==='Late night'?'late night':e.meal.toLowerCase();
+  const head=`For ${lbl}: up to ${fmt(B.kcal)} kcal · sodium ${fmt(B.na)} mg${B.pu<Infinity?` · purine ${fmt(B.pu)} mg`:''}${B.veg>=150?' · ½ plate veg':''}.`;
+  const none=e.shown.length&&e.shown[0].fails.length?'<div class="says amber"><b>Nothing fits every limit right now</b> · these are the closest</div>':'';
   return `<div class="card"><h5>${e.meal==='Late night'?'Late-night':e.meal} ideas${e.mode?` · ${e.mode==='nau'?'cook':'eat out'}`:''}<small>Tap ✓ to log it</small></h5>
-    <div class="foods">${head}</div><div class="mlist">${rows||'<div class="says">No ideas yet.</div>'}</div>
-    ${n>3?`<button class="linkbtn" data-smore="${e.id}">Other ideas</button>`:''}</div>`}
+    <div class="foods">${head}</div>${none}<div class="mlist">${rows||'<div class="says">No ideas yet.</div>'}</div>
+    ${n>3?`<button class="linkbtn" data-smore="${e.id}">Other ideas</button>`:''}<div class="why-src" style="margin:6px 0 0">${LIMIT_SRC}</div></div>`}
 function handleSuggestText(n,raw){
   if(ALIAS.has(n))return false;
   if(!/\b(goi y|de xuat|suggest|suggestion|recommend|ideas?)\b|\ban gi\b|\bnen an\b|what (should|can|to) (i )?(eat|have|cook)|\b(hungry|doi bung|doi qua)\b/.test(n))return false;
@@ -1238,14 +1279,14 @@ $('#qchips').addEventListener('click',ev=>{const b=ev.target.closest('.qchip');i
 $('#timeline').addEventListener('click',ev=>{
   const g=ev.target.closest('[data-goto]');if(g){switchTab(g.dataset.goto);return}
   const se=ev.target.closest('[data-seat]');if(se){const [id,i]=se.dataset.seat.split('|'),c=state.entries.find(x=>x.id===id),o=c&&c.shown&&c.shown[+i];if(!o)return;
-    c.done[o.name]=true;const e=addMeal(o.name,nowT(),new Date().getHours(),{meal:c.meal==='Late night'||c.meal==='Snack'?c.meal:c.meal,items:o.l.map(fid=>applyHabits(withParts({fid,qty:1,size:'M'})))});
+    c.done[o.name]=true;const e=addMeal(o.name,nowT(),new Date().getHours(),{meal:c.meal,items:JSON.parse(JSON.stringify(o.items))});
     e.user=true;state.undo=()=>{state.entries=state.entries.filter(x=>x!==e);delete c.done[o.name]};renderAll();showToast('Saved · '+o.name);return}
   const smo=ev.target.closest('[data-smore]');if(smo){const c=state.entries.find(x=>x.id===smo.dataset.smore);if(c){c.off++;renderTimeline()}return}
   const op=ev.target.closest('[data-open]');if(op){const k=op.dataset.open;state.menu.open=state.menu.open||{};state.menu.open[k]=!state.menu.open[k];renderTimeline();return}
   const md=ev.target.closest('[data-mode]');if(md){const m=state.menu,meal=md.dataset.meal;m.mode[meal]=md.dataset.mode;m.pickIdx[meal]=0;
     try{localStorage.setItem('bh_menu_mode',JSON.stringify(m.mode))}catch(e){}if(LIVE)enqueue('set:menu_mode','saveSetting',{key:'menu_mode',value:m.mode});renderTimeline();return}
   const eat=ev.target.closest('[data-eat]');if(eat){const meal=eat.dataset.eat,o=curPick(meal);
-    state.menu.done[meal]=true;addMeal(o.name,nowT(),new Date().getHours(),{meal,items:o.ids.map(id=>({fid:id,qty:1,size:'M'}))});renderAll();return}
+    state.menu.done[meal]=true;const e2=addMeal(o.name,nowT(),new Date().getHours(),{meal,items:JSON.parse(JSON.stringify(o.items))});e2.user=true;renderAll();return}
   const sw=ev.target.closest('[data-swap]');if(sw){const m=sw.dataset.swap;state.menu.pickIdx[m]++;renderTimeline();return}
   const mo=ev.target.closest('[data-mealof]');if(mo){state.mealPick=state.mealPick===mo.dataset.mealof?null:mo.dataset.mealof;renderTimeline();const mr=document.querySelector('.mealrow');if(mr&&mr.scrollIntoView)mr.scrollIntoView({block:'nearest',behavior:'smooth'});return}
   const sm=ev.target.closest('[data-setmeal]');if(sm){const [id,m]=sm.dataset.setmeal.split('|'),e=state.entries.find(x=>x.id===id);if(e)e.meal=m;state.mealPick=null;renderTimeline();return}
