@@ -146,6 +146,20 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .menu-row .t{font-size:11px;color:var(--faint);font-weight:600;letter-spacing:.05em;text-transform:uppercase;display:flex;gap:6px;align-items:center}
 .mlist{display:grid}
 .mw.warn{color:var(--amber)!important}.mw.wrap{white-space:normal;color:var(--muted)}
+.mw svg{vertical-align:-1px}
+.lims{display:grid;gap:7px}
+.lims .lh{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+.lim{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:baseline}
+.lim .ln{color:var(--ink);font-weight:600;font-size:12.5px}
+.lim .lv{justify-self:end;font-size:12.5px;color:var(--muted)}
+.lim .lv b{color:var(--amber);font-weight:700}
+.lim .lb{grid-column:1/-1;position:relative;height:6px;border-radius:999px;background:var(--line)}
+.lim .lb i{position:absolute;inset:0 auto 0 0;border-radius:inherit;background:var(--green)}
+.lim.near .lb i{background:var(--amber);opacity:.6}
+.lim.bad .lb i{background:var(--amber)}
+.lim .lb em{position:absolute;top:-3px;bottom:-3px;width:2px;margin-left:-1px;border-radius:1px;background:var(--ink);opacity:.55}
+.lim-why{font-size:12.5px} .mdetail .linkbtn[data-mode]{justify-self:start;margin-top:-4px}
+.lim-note{font-size:12.5px;color:var(--amber);font-weight:600}
 .mrow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border-top:1px solid var(--line);padding:8px 0}
 .mrow:first-child{border-top:0;padding-top:2px}
 .mhead{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;text-align:left;min-width:0}
@@ -560,6 +574,7 @@ const IC={
  dish:'<path d="M3 16h18M5 16a7 7 0 0 1 14 0" fill="currentColor" fill-opacity=".1"/><path d="M3 16h18M5 16a7 7 0 0 1 14 0M12 6.5v2"/>',
  drop:'<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z" fill="currentColor" fill-opacity=".18"/><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
  check:'<path d="M5 12.5 10 17 19 7.5"/>',
+ warn:'<path d="M12 4 2.8 19.5h18.4z"/><path d="M12 10v4.2M12 17h.01"/>',
  spark:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>',
  milkglass:'<path d="M7 4h10l-1 16H8z" fill="currentColor" fill-opacity=".18"/><path d="M7 4h10l-1 16H8zM7.5 9h9"/>',
  grain:'<path d="M12 21V8M12 8c-2-1-3-3-3-5 2 0 3 1.5 3 3 0-1.5 1-3 3-3 0 2-1 4-3 5zM12 13c-2-1-4-1-5-3 2-.5 4 .5 5 2M12 13c2-1 4-1 5-3-2-.5-4 .5-5 2"/>',
@@ -928,8 +943,8 @@ function mealBudget(meal,useToday){
     pu:hasC('Gout')?left(T.pu,t.purine_mg,main?60:20):Infinity,su:left(T.su,t.sugar_g,main?3:2),sat:left(T.sat,t.satfat_g,main?2:1),
     veg:main?(meal==='Breakfast'?60:150):0,pro:main?T.pro*sh*.85:0,fib:main?T.fib*sh*.7:0}}
 const freeSugarOf=items=>sumItems(items.filter(it=>{const f=FOOD[it.fid];return !(f.groups.includes('trai_cay')||/khong_duong/.test(it.fid))})).sugar_g;
-function evalOpt(items,B){const v=sumItems(items),fails=[],goods=[];let pen=0;
-  const over=(x,cap,lbl,u,w)=>{if(x>cap){pen+=(x-cap)/cap*w;if(x>cap*1.1)fails.push(`${lbl} ${fmt(x)}${u} (limit ${fmt(cap)}${u})`)}};
+function evalOpt(items,B){const v=sumItems(items),fails=[],goods=[],lims=[];let pen=0;
+  const over=(x,cap,lbl,u,w)=>{if(!isFinite(cap))return;const bad=x>cap*1.1;lims.push({lbl,x,cap,u,bad});if(x>cap){pen+=(x-cap)/cap*w;if(x>cap*1.1)fails.push(`${lbl} ${fmt(x)}${u} (limit ${fmt(cap)}${u})`)}};
   over(v.sodium_mg,B.na,'Sodium',' mg',60);if(B.pu<Infinity)over(v.purine_mg,B.pu,'Purine',' mg',60);
   over(freeSugarOf(items),B.su,'Sugar',' g',hasC('Prediabetes')?50:30);over(v.satfat_g,B.sat,'Saturated fat',' g',hasC('High cholesterol')?40:20);
   pen+=Math.max(0,v.kcal-B.kcal*1.15)/B.kcal*50+Math.max(0,B.kcal*.55-v.kcal)/B.kcal*20;
@@ -937,7 +952,7 @@ function evalOpt(items,B){const v=sumItems(items),fails=[],goods=[];let pen=0;
   need(v.veg_g,B.veg,15,B.veg>=150?'½ plate veg':'some veg');need(v.protein_g,B.pro,12,fmt(v.protein_g)+' g protein');
   need(v.fiber_g,B.fib,hasC('Prediabetes')||hasC('High cholesterol')?12:8,fmt(v.fiber_g)+' g fiber');
   if(hasC('Gout')&&items.some(it=>['noi_tang','hai_san_vo'].some(t=>FOOD[it.fid].tags.includes(t)))){pen+=100;fails.unshift('Organ meat / shellfish (gout)')}
-  return {v,pen,fails,goods}}
+  return {v,pen,fails,goods,lims}}
 function variants(list){
   const base=list.map(id=>withParts({fid:id,qty:1,size:'M'})),out=[{items:base,tip:tipFor(list)}],lite=JSON.parse(JSON.stringify(base)),ch=new Set();
   lite.forEach(it=>{(it.parts||[]).forEach(p=>{if(p.hid&&/nuoc_dung/.test(p.fid)){p.qty=.3;ch.add('broth')}if(/nuoc_mam|nuoc_cham|mam_tom/.test(p.fid)){p.qty=.4;ch.add('sauce')}});
@@ -968,8 +983,22 @@ function rankMeal(meal,mode,useToday,exclude=new Set()){
     o.sc=sc;o.kcal=o.v.kcal;o.name=(c.name||c.ids.map(id=>shortName(FOOD[id])).join(' + '))+(o.side?' + '+shortName(FOOD[o.side]):'');
     o.tip=[c.tip,o.side?(SOUP_SIDES.includes(o.side)?'ask for extra '+shortName(FOOD[o.side]).toLowerCase():'add a side of '+shortName(FOOD[o.side]).toLowerCase()):''].filter(Boolean).join('; ');
     o.why=o.fails.length?'Over: '+o.fails[0]:(o.goods.slice(0,2).join(' · ')||'Within your limits');
+    o.short=whyShort(o);
     const k=o.src+':'+c.ids.join('+');if(!by.has(k)||by.get(k).sc<o.sc)by.set(k,o)}
-  return {B,list:[...by.values()].sort((a,b)=>b.sc-a.sc)}}
+  return {B,list:[...by.values()].sort((a,b)=>(a.fails.length>0)-(b.fails.length>0)||b.sc-a.sc)}}
+/* Dòng tóm tắt ngắn cho hàng thu gọn: "Sodium +22%" thay vì cả câu dài bị cắt. */
+const SHORT_LBL={'Saturated fat':'Sat. fat'};
+function whyShort(o){const bad=o.lims.filter(l=>l.bad),organ=o.fails.length&&!bad.some(l=>o.fails[0].startsWith(l.lbl));
+  if(!o.fails.length)return o.why;
+  const parts=[...(organ?['Organ meat / shellfish']:[]),...bad.map(l=>`${SHORT_LBL[l.lbl]||l.lbl} +${Math.round((l.x/l.cap-1)*100)}%`)];
+  return parts.length>2?`${parts[0]} · +${parts.length-1} more`:parts.join(' · ')}
+/* Thanh so với giới hạn: vạch dọc = giới hạn bữa, phần vượt tô cam. */
+function limitsHTML(o){if(!o.lims.length&&!o.fails.length)return '';
+  const organ=o.fails.length&&!o.lims.some(l=>l.bad&&o.fails[0].startsWith(l.lbl))?`<div class="lim-note">${svg('warn',12)} ${esc(o.fails[0])}</div>`:'';
+  const rows=o.lims.map(l=>{const max=Math.max(l.x,l.cap)*1.08,w=l.x/max*100,cap=l.cap/max*100,over=l.x>l.cap,pct=Math.round((l.x/l.cap-1)*100);
+    return `<div class="lim${l.bad?' bad':over?' near':''}"><span class="ln">${l.lbl}</span><span class="lv num">${fmt(l.x)} / ${fmt(l.cap)}${l.u}${over?` <b>+${pct}%</b>`:''}</span>
+      <span class="lb" role="img" aria-label="${l.lbl} ${fmt(l.x)} of ${fmt(l.cap)}${l.u} limit"><i style="width:${w.toFixed(1)}%"></i><em style="left:${cap.toFixed(1)}%"></em></span></div>`}).join('');
+  return `<div class="lims"><div class="lh">${o.fails.length?'Over this meal\u2019s limit':'Within this meal\u2019s limits'}</div>${organ}${rows}</div>`}
 const condFocus=()=>[hasC('High blood pressure')&&'low sodium',hasC('Gout')&&'low purine',hasC('Prediabetes')&&'more fiber, less sugar',hasC('High cholesterol')&&'less saturated fat'].filter(Boolean);
 const LIMIT_SRC='Limits: sodium AHA · purine Japanese gout guideline · sugar WHO/ADA · plate ADA/Harvard. Not a prescription; your doctor’s limits come first.';
 function buildMenu(){const gp=enoughHist()?gaps(analyse(7)):[],out={},used=new Set(),modes=loadModes();
@@ -1062,18 +1091,21 @@ function comment(e,t,gp){
 function menuCard(){
   const m=state.menu;m.open=m.open||{};
   const rows=['Breakfast','Lunch','Dinner'].map(meal=>{const o=curPick(meal),done=m.done[meal],md=m.mode[meal],open=m.open[meal];
-    const v=o.v,short=o.why;
+    const v=o.v,short=o.short;
     return `<div class="mrow${open?' open':''}${done?' done':''}">
       <button class="mhead" data-open="${meal}" aria-expanded="${!!open}">
         <span class="mi ${md}">${svg(iconKey(FOOD[o.ids[0]]),16)}</span>
         <span class="mtxt"><span class="mt">${meal}<span class="dotsep">·</span>${md==='quan'?'Eat out':'Cook'}</span>
-          <span class="mn">${esc(o.name)}</span><span class="mw num${o.fails.length?' warn':''}">${esc(short)} · ${fmt(o.kcal)} kcal</span></span>
+          <span class="mn">${esc(o.name)}</span><span class="mw num${o.fails.length?' warn':''}">${o.fails.length?svg('warn',11)+' ':''}${esc(short)} · ${fmt(o.kcal)} kcal</span></span>
       </button>
       ${done?`<span class="eat done" aria-label="Logged">${svg('check',16)}</span>`:`<button class="eat" data-eat="${meal}" aria-label="Eat this: ${esc(o.name)}">${svg('check',16)}</button>`}
       ${open?`<div class="mdetail">
         <div class="mode" role="group" aria-label="Eat out or cook">${[['quan','Eat out'],['nau','Cook']].map(([k,l])=>`<button data-mode="${k}" data-meal="${meal}" aria-pressed="${md===k}">${l}</button>`).join('')}</div>
+        ${limitsHTML(o)}
+        ${o.fails.length?(()=>{const alt=m.meals[meal][md==='quan'?'nau':'quan'][0],ok=alt&&!alt.fails.length;
+          return `<p class="lim-why">Closest ${md==='quan'?'eat-out':'home-cooked'} option: no ${md==='quan'?'eat-out':'cooked'} dish fits every limit for this meal${ok?`. <b>${esc(alt.name)}</b> (${md==='quan'?'cook':'eat out'}) fits.`:'. Tips below cut the gap.'}</p>${ok?`<button class="linkbtn" data-mode="${md==='quan'?'nau':'quan'}" data-meal="${meal}">Switch to ${md==='quan'?'cook':'eat out'}</button>`:''}`})():''}
         ${o.tip?`<p><b>${o.src==='quan'?'How to order':'How to cook'}:</b> ${esc(o.tip)}</p>`:''}
-        <p class="num">≈ ${fmt(o.kcal)} kcal · sodium ${fmt(v.sodium_mg)} mg${hasC('Gout')?` · purine ${fmt(v.purine_mg)} mg`:''} · fiber ${fmt(v.fiber_g)} g · protein ${fmt(v.protein_g)} g · veg ${fmt(v.veg_g)} g</p>
+        <p class="num">≈ ${fmt(o.kcal)} kcal · fiber ${fmt(v.fiber_g)} g · protein ${fmt(v.protein_g)} g · veg ${fmt(v.veg_g)} g</p>
         <div class="mact"><button class="linkbtn" data-swap="${meal}">Swap dish</button>${done?'':`<button class="btn-s" data-eat="${meal}">Eat this</button>`}</div></div>`:''}
     </div>`}).join('');
   const gp=(m.gp.length?m.gp.slice(0,3).map(x=>x.n.toLowerCase()):condFocus()).join(', ');
@@ -1102,17 +1134,17 @@ function suggList(meal,mode){
   if(mode||!B.main)return {B,list};
   const q=list.filter(o=>o.src==='quan'),h=list.filter(o=>o.src==='nau'),mix=[];
   while(q.length||h.length){if(q.length)mix.push(q.shift());if(h.length)mix.push(h.shift());if(q.length)mix.push(q.shift())}
-  return {B,list:mix}}
+  // Xen kẽ quán/nấu nhưng món đạt ngưỡng vẫn luôn đứng trước món vượt
+  return {B,list:mix.sort((a,b)=>(a.fails.length>0)-(b.fails.length>0))}}
 function suggCard(e){
   const {B,list:L}=suggList(e.meal,e.mode),n=L.length,st=(e.off*3)%Math.max(1,n);
   e.shown=[0,1,2].map(i=>L[(st+i)%n]).filter((o,i,a)=>o&&a.indexOf(o)===i);e.done=e.done||{};
   const rows=e.shown.map((o,i)=>`<div class="mrow open${e.done[o.name]?' done':''}"><div class="mhead">
       <span class="mi ${o.src==='nau'?'nau':'quan'}">${svg(iconKey(FOOD[o.ids[0]]),16)}</span>
       <span class="mtxt"><span class="mt">${o.src==='nau'?'Cook':o.src==='snack'?'Light bite':'Eat out'}</span><span class="mn">${esc(o.name)}</span>
-        <span class="mw num${o.fails.length?' warn':''}">${esc(o.why)}</span>
-        <span class="mw num wrap">${fmt(o.v.kcal)} kcal · sodium ${fmt(o.v.sodium_mg)} mg${B.pu<Infinity?` · purine ${fmt(o.v.purine_mg)} mg`:''}</span></span></div>
+        <span class="mw num${o.fails.length?' warn':''}">${o.fails.length?svg('warn',11)+' ':''}${esc(o.short)} · ${fmt(o.v.kcal)} kcal</span></span></div>
       ${e.done[o.name]?`<span class="eat done" aria-label="Logged">${svg('check',16)}</span>`:`<button class="eat" data-seat="${e.id}|${i}" aria-label="Eat this: ${esc(o.name)}">${svg('check',16)}</button>`}
-      ${o.tip?`<div class="mdetail"><p><b>${o.src==='nau'?'How to cook':'How to order'}:</b> ${esc(o.tip)}</p></div>`:''}</div>`).join('');
+      <div class="mdetail">${limitsHTML(o)}${o.tip?`<p><b>${o.src==='nau'?'How to cook':'How to order'}:</b> ${esc(o.tip)}</p>`:''}</div></div>`).join('');
   const lbl=e.meal==='Late night'?'late night':e.meal.toLowerCase();
   const head=`For ${lbl}: up to ${fmt(B.kcal)} kcal · sodium ${fmt(B.na)} mg${B.pu<Infinity?` · purine ${fmt(B.pu)} mg`:''}${B.veg>=150?' · ½ plate veg':''}.`;
   const none=e.shown.length&&e.shown[0].fails.length?'<div class="says amber"><b>Nothing fits every limit right now</b> · these are the closest</div>':'';
