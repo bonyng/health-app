@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009000336";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009091505";
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <title>Bony Health</title>
@@ -286,6 +286,12 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .mealrow{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 0 4px}
 .mealrow button{height:30px;padding:0 10px;border-radius:9px;font-size:12.5px;background:var(--surface);border:1px solid var(--line)}
 .mealrow button[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
+.mealrow button.del{color:var(--red);border-color:var(--red);display:inline-flex;align-items:center;gap:4px;margin-left:auto}
+.sys[data-water]{cursor:pointer}
+button.bottle-row{width:100%;text-align:left;font:inherit;color:inherit;background:none;border:0;border-bottom:1px solid var(--line);cursor:pointer}
+.bottle-row .chev{color:var(--muted)}
+.swatches{display:flex;gap:10px;flex-wrap:wrap}.swatches button{width:32px;height:32px;border-radius:50%;border:3px solid transparent}.swatches button[aria-pressed="true"]{border-color:var(--ink,#18181B)}
+.brow-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.danger{color:var(--red)!important;border-color:var(--red)!important}
 .plist{display:grid;gap:6px}
 .prow{display:grid;grid-template-columns:32px 1fr auto auto;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--line);border-radius:14px;background:var(--surface)}
 .prow.off .pn{color:var(--muted);text-decoration:line-through}
@@ -1130,7 +1136,7 @@ function renderTimeline(){
   const t=totals(),gp=state.menu?state.menu.gp:[];
   $('#timeline').innerHTML='<div class="daysep">Today</div>'+state.entries.map(e=>{
     const pop=e.fresh?'pop':'';
-    if(e.kind==='water')return `<div class="sys ${pop}">${svg('drop',14)}<span class="num">${e.t?e.t+' · ':''}${esc(e.text)}</span></div>`;
+    if(e.kind==='water')return `<div class="sys ${pop}" data-water="1" title="Tap to change">${svg('drop',14)}<span class="num">${e.t?e.t+' · ':''}${esc(e.text)}</span></div>`;
     if(e.kind==='weight')return `<div class="sys ${pop}">${svg('scale',14)}<span class="num">${e.t?e.t+' · ':''}${esc(e.text)}</span></div>`;
     if(e.kind==='ask')return `<div class="me ${pop}"><div class="bubble">${esc(e.text)}</div></div>`;
     if(e.kind==='card'){const body=e.type==='menu'?menuCard():e.type==='report'?reportCard():e.type==='sugg'?suggCard(e):answerCard(e.type);
@@ -1139,7 +1145,7 @@ function renderTimeline(){
     return `<div class="me ${pop}"><div class="bubble">${esc(e.text)}</div></div>
     <div class="bot ${pop}">${AV()}<div class="bot-col"><div class="card"><div class="chips">${e.items.map((it,i)=>chipHTML('e:'+e.id+':'+i,it)).join('')}</div>${ibarFor('e:'+e.id+':',e.items)}${partsHTML(e.items)}${plateHTML(e.items)}
       <div class="says ${lv}"><b>${head}</b> · ${tail}</div></div>
-      <div class="meta num"><button class="mealbtn" data-mealof="${e.id}">${e.date?'Yesterday · ':''}${e.meal} ▾</button> · ${e.t} · ${fmt(v.kcal)} kcal${v.caffeine_mg>0?` · caffeine ${fmt(v.caffeine_mg)} mg`:''}${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}</div>${state.mealPick===e.id?`<div class="mealrow">${MEALS.map(m=>`<button data-setmeal="${e.id}|${m}" aria-pressed="${e.meal===m}">${m}</button>`).join('')}</div>`:''}</div></div>`;
+      <div class="meta num"><button class="mealbtn" data-mealof="${e.id}">${e.date?'Yesterday · ':''}${e.meal} ▾</button> · ${e.t} · ${fmt(v.kcal)} kcal${v.caffeine_mg>0?` · caffeine ${fmt(v.caffeine_mg)} mg`:''}${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}</div>${state.mealPick===e.id?`<div class="mealrow">${MEALS.map(m=>`<button data-setmeal="${e.id}|${m}" aria-pressed="${e.meal===m}">${m}</button>`).join('')}<button class="del" data-delmeal="${e.id}">${svg('trash',13)}Delete</button></div>`:''}</div></div>`;
   }).join('');
   state.entries.forEach(e=>e.fresh=false);
   if(LIVE)schedulePersist();
@@ -1233,6 +1239,11 @@ async function lookupUnknown(e){if(!LIVE)return;
 function addToHist(e){const t=yday().getTime();let d=HIST.find(h=>h.date.getTime()===t);
   if(!d){d={date:yday(),items:[],water:0};HIST.push(d);HIST.sort((a,b)=>a.date-b.date)}
   d.items.push(...e.items.filter(it=>it.fid).map(it=>({...it,meal:e.meal})))}
+function deleteMeal(id){const i=state.entries.findIndex(x=>x.id===id);if(i<0)return;const e=state.entries[i];
+  let hd=null,hit=[];if(e.date){const t=yday().getTime();hd=HIST.find(h=>h.date.getTime()===t);
+    if(hd){const n=e.items.filter(it=>it.fid).length;hit=hd.items.splice(hd.items.length-n,n)}}
+  state.entries.splice(i,1);state.mealPick=null;state.pick=null;
+  state.undo=()=>{state.entries.splice(i,0,e);if(hd)hd.items.push(...hit)};renderAll(false);showToast('Deleted · '+e.text)}
 function settleHabits(){const es=state.entries.filter(e=>e.kind==='meal'&&e.user&&!e.hab);if(es.length){rememberHabits(es.flatMap(e=>e.items));es.forEach(e=>e.hab=true)}}
 const MEALS=['Breakfast','Lunch','Snack','Dinner','Late night','Drinks'];
 function renderTray(){
@@ -1289,6 +1300,8 @@ $('#timeline').addEventListener('click',ev=>{
     state.menu.done[meal]=true;const e2=addMeal(o.name,nowT(),new Date().getHours(),{meal,items:JSON.parse(JSON.stringify(o.items))});e2.user=true;renderAll();return}
   const sw=ev.target.closest('[data-swap]');if(sw){const m=sw.dataset.swap;state.menu.pickIdx[m]++;renderTimeline();return}
   const mo=ev.target.closest('[data-mealof]');if(mo){state.mealPick=state.mealPick===mo.dataset.mealof?null:mo.dataset.mealof;renderTimeline();const mr=document.querySelector('.mealrow');if(mr&&mr.scrollIntoView)mr.scrollIntoView({block:'nearest',behavior:'smooth'});return}
+  const dm=ev.target.closest('[data-delmeal]');if(dm){deleteMeal(dm.dataset.delmeal);return}
+  if(ev.target.closest('[data-water]')){openWater();return}
   const sm=ev.target.closest('[data-setmeal]');if(sm){const [id,m]=sm.dataset.setmeal.split('|'),e=state.entries.find(x=>x.id===id);if(e)e.meal=m;state.mealPick=null;renderTimeline();return}
   const ib=ev.target.closest('[data-ib]');if(ib){ibTap(ib);return}
   const c=ev.target.closest('.chip[data-ref]');if(c)chipTap(c.dataset.ref);
@@ -1629,11 +1642,11 @@ function renderProfile(){
       <button class="ghost" id="addWeight">+ Weigh in</button><div class="foods">Or type “weight 71.5” in the input.</div></section>`})()}
     <section class="panel"><h4>Health conditions</h4><div class="tags">${PROFILE.cond.length?PROFILE.cond.map(c=>`<span class="tag">${c}</span>`).join(''):'<span class="tag">None selected</span>'}</div></section>
     <section class="panel"><h4>Daily targets<small>Tap to see how it is calculated</small></h4><div class="targets">${keys.map(k=>`<button class="tg" data-m="${k}"><span>${WHY[k].n}</span><b class="num">${WHY[k].lim?'≤ ':''}${fmt(WHY[k].g())} ${WHY[k].u}</b></button>`).join('')}</div></section>
-    <section class="panel"><h4>My bottles</h4><div>${state.bottles.map(b=>`<div class="bottle-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${b.color}" stroke-width="2"><path d="M10 2h4v3h-4zM8 7h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg></span><div>${esc(b.name)}<small class="num">${b.ml} ml</small></div>${b.def?'<span class="def">Default</span>':''}</div>`).join('')}</div><button class="ghost" id="addBottle">+ Add bottle</button></section>
+    <section class="panel"><h4>My bottles<small>Tap a bottle to edit or delete</small></h4><div>${state.bottles.map(b=>`<button class="bottle-row" data-bid="${b.id}"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="${b.color}" stroke-width="2"><path d="M10 2h4v3h-4zM8 7h8a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2z"/></svg></span><div>${esc(b.name)}<small class="num">${b.ml} ml</small></div>${b.def?'<span class="def">Default</span>':''}<span class="chev">›</span></button>`).join('')}</div><button class="ghost" id="addBottle">+ Add bottle</button></section>
     <button class="primary" id="exportPdf">Export report for doctor</button>
     ${PROFILE.mine&&!LIVE?'<button class="link" id="resetProfile" style="justify-self:center">Clear saved measurements, use sample numbers</button>':''}</div>`;
   $('#editProfile').onclick=openProfileForm;if($('#editProfile2'))$('#editProfile2').onclick=openProfileForm;if($('#resetProfile'))$('#resetProfile').onclick=resetProfile;
-  $('#addBottle').onclick=openBottleForm;$('#addWeight').onclick=openWeight;$('#exportPdf').onclick=()=>showToast(LIVE?'Doctor report is coming in the next update':'The real app will create a 30-day PDF in your Drive',false);
+  $('#addBottle').onclick=()=>openBottleForm();$('#scrProfile').querySelectorAll('[data-bid]').forEach(x=>x.onclick=()=>openBottleForm(state.bottles.find(b=>b.id===x.dataset.bid)));$('#addWeight').onclick=openWeight;$('#exportPdf').onclick=()=>showToast(LIVE?'Doctor report is coming in the next update':'The real app will create a 30-day PDF in your Drive',false);
   $('#scrProfile').querySelectorAll('.tg').forEach(b=>b.onclick=()=>openWhy(b.dataset.m));
   if(LIVE)schedulePersist();
 }
@@ -1669,14 +1682,31 @@ function openProfileForm(){
 }
 function resetProfile(){try{localStorage.removeItem('bh_profile')}catch(e){}
   Object.assign(PROFILE,{born:1990,sex:'Male',h:170,w:71,act:1.375,cond:['Gout','Prediabetes','High cholesterol','High blood pressure'],mine:false});recalc();state.menu=buildMenu();renderProfile();renderAll(false);showToast('Back to sample numbers',false)}
-function openBottleForm(){
-  let ml=500;
-  openSheet(`<h3 id="sheetTitle">Add bottle</h3><div class="field"><label for="bName">Bottle name</label><input id="bName" type="text" value="Thermos"></div>
-    <div class="field"><label>Capacity (ml)</label><div class="stepper"><button data-d="-50" aria-label="Minus 50 ml">−</button><output id="bMl" class="num">500</output><button data-d="50" aria-label="Plus 50 ml">+</button></div></div>
-    <div class="ml-row">${[250,350,500,700,1000].map(v=>`<button data-v="${v}" class="num">${fmt(v)}</button>`).join('')}</div><p class="sub" id="bHint" style="margin:0"></p><button class="primary" id="bSave">Save bottle</button>`);
-  const hint=()=>{$('#bMl').textContent=fmt(ml);$('#bHint').textContent=`Target ${fmt(T.water)} ml ≈ ${quarter(T.water/ml)} of this bottle`};hint();
+const BCOLORS=['#2477E8','#1E9E62','#18908A','#E8862A','#D64545','#8E6BBF'];
+function openBottleForm(b){
+  const ed=!!b;let ml=ed?b.ml:500,color=ed?b.color:'#18908A',def=ed?!!b.def:false;
+  const only=state.bottles.length<=1,cnt=ed?state.counts[b.id]||0:0;
+  openSheet(`<h3 id="sheetTitle">${ed?'Edit bottle':'Add bottle'}</h3><div class="field"><label for="bName">Bottle name</label><input id="bName" type="text" value="${esc(ed?b.name:'Thermos')}"></div>
+    <div class="field"><label>Capacity (ml)</label><div class="stepper"><button data-d="-50" aria-label="Minus 50 ml">−</button><output id="bMl" class="num">${fmt(ml)}</output><button data-d="50" aria-label="Plus 50 ml">+</button></div></div>
+    <div class="ml-row">${[250,350,500,700,1000].map(v=>`<button data-v="${v}" class="num">${fmt(v)}</button>`).join('')}</div>
+    <div class="field"><label>Color</label><div class="swatches">${BCOLORS.map(c=>`<button data-c="${c}" style="background:${c}" aria-label="Color ${c}" aria-pressed="${c===color}"></button>`).join('')}</div></div>
+    <div class="field"><label>Default bottle</label><div class="seg s2" data-g="def"><button type="button" data-def="1" aria-pressed="${def}">Yes</button><button type="button" data-def="0" aria-pressed="${!def}">No</button></div><small class="foods">The water button and “uống 2 bình” use the default bottle.</small></div>
+    <p class="sub" id="bHint" style="margin:0"></p>
+    ${ed?`<div class="brow-actions"><button class="ghost danger" id="bDel" ${only?'disabled':''}>${only?'Keep at least 1 bottle':'Delete bottle'}</button><button class="primary" id="bSave">Save</button></div>`:'<button class="primary" id="bSave">Save bottle</button>'}`);
+  const hint=()=>{$('#bMl').textContent=fmt(ml);$('#bHint').textContent=`Target ${fmt(T.water)} ml ≈ ${quarter(T.water/ml)} of this bottle`+(ed&&cnt&&ml!==b.ml?` · today's ${quarter(cnt)} bottle(s) will count at the new size`:'')};hint();
+  const setDef=id=>state.bottles.forEach(x=>x.def=x.id===id);
   $('#sheet').onclick=ev=>{const x=ev.target.closest('button');if(!x)return;if(x.dataset.d){ml=Math.max(50,ml+ +x.dataset.d);hint()}if(x.dataset.v){ml=+x.dataset.v;hint()}
-    if(x.id==='bSave'){const id='b'+Date.now();state.bottles.push({id,name:$('#bName').value.trim()||'New bottle',ml,color:'#18908A'});state.counts[id]=0;closeSheet();renderProfile();showToast('Bottle added',false)}};
+    if(x.dataset.c){color=x.dataset.c;$('#sheet').querySelectorAll('[data-c]').forEach(y=>y.setAttribute('aria-pressed',y===x))}
+    if(x.dataset.def){def=x.dataset.def==='1';$('#sheet').querySelectorAll('[data-def]').forEach(y=>y.setAttribute('aria-pressed',y===x))}
+    if(x.id==='bSave'){const name=$('#bName').value.trim()||'New bottle';
+      if(ed){Object.assign(b,{name,ml,color});if(def)setDef(b.id);else if(b.def){b.def=false;const o=state.bottles.find(y=>y!==b);if(o)o.def=true}}
+      else{const id='b'+Date.now();state.bottles.push({id,name,ml,color});state.counts[id]=0;if(def)setDef(id)}
+      if(!state.bottles.some(y=>y.def))state.bottles[0].def=true;
+      closeSheet();renderProfile();renderAll(false);showToast(ed?'Bottle updated':'Bottle added',false)}
+    if(x.id==='bDel'&&!only){if(!confirm(`Delete “${b.name}”?`+(cnt?` Today's ${quarter(cnt)} bottle(s) stay counted as ${fmt(cnt*b.ml)} ml.`:'')))return;
+      if(cnt)state.extra+=cnt*b.ml;delete state.counts[b.id];state.bottles=state.bottles.filter(y=>y!==b);
+      if(!state.bottles.some(y=>y.def))state.bottles[0].def=true;if(state.sel===b.id)state.sel=(state.bottles.find(y=>y.def)||state.bottles[0]).id;
+      closeSheet();renderProfile();renderAll(false);showToast('Bottle deleted',false)}};
 }
 
 /* ---------- đồng bộ với Google Sheet (bản thật) ----------
