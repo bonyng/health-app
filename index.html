@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130129";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130451";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -400,6 +400,11 @@ button.sb{cursor:pointer}
 .grow{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center}
 .grow .gi{width:28px;height:28px;border-radius:9px;display:grid;place-items:center}
 .grow .gi svg{width:16px;height:16px}
+.tgrow{cursor:pointer;border-radius:10px;margin:0 -6px;padding:4px 6px}.tgrow:active,.tgrow.on{background:var(--raised)}
+.tgchev{font-style:normal;display:inline-block;margin-left:6px;color:var(--faint);transition:transform .15s}.tgrow.on .tgchev{transform:rotate(90deg)}
+.tgbr{margin:2px 0 6px 38px;padding:6px 10px;border-left:2px solid var(--line);display:grid;gap:3px}
+.tgm{display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px}.tgm:first-child{margin-top:0}.tgm span{color:var(--muted);font-size:12.5px}
+.tgi{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--muted);padding-left:8px}.tgi span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .grow .nm{font-size:13.5px;font-weight:500}
 .grow .val{font-size:12.5px;color:var(--muted);text-align:right}
 .grow .meter,.orow .meter{grid-column:2/-1;height:6px;border-radius:6px;background:var(--sunken);position:relative;margin-top:-4px}
@@ -1920,7 +1925,14 @@ function renderDay(off){
   const tg=[['Calories','kcal',T.kcal,'kcal',1,'bowl'],['Sodium','sodium_mg',T.na,'mg',1,'dip'],['Sugar','sugar_g',T.su,'g',1,'dessert'],['Water','water',T.water,'ml',0,'drop'],['Protein','protein_g',T.pro,'g',0,'egg'],['Fiber','fiber_g',T.fib,'g',0,'grain'],
     ...(t.caffeine_mg>0?[['Caffeine','caffeine_mg',T.cf,'mg',1,'coffee']]:[]),...(hasC('Gout')?[['Purine','purine_mg',T.pu,'mg',1,'shrimp']]:[])];
   const trow=([n,k,g,u,lim,ic])=>{const v=t[k],r=v/g,c=lim?(r<=1?'green':r<=1.15?'amber':'red'):(r>=.9?'green':r>=.6?'amber':'red');
-    return `<div class="grow"><span class="gi s-${c}">${svg(ic,16)}</span><span class="nm">${n}</span><span class="val num">${fmt(v)} / ${lim?'≤ ':''}${fmt(g)} ${u}</span><span class="meter"><i class="c-${c}" style="width:${Math.min(100,r*80)}%"></i><em style="left:80%"></em></span></div>`};
+    // Bấm 1 chỉ số (trừ nước) → xem từng bữa, từng món góp bao nhiêu
+    const can=k!=='water',open=can&&state.tgOpen===off+'|'+k;
+    return `<div class="grow${can?' tgrow':''}${open?' on':''}"${can?` data-tg="${k}" role="button" tabindex="0" aria-expanded="${open}"`:''}><span class="gi s-${c}">${svg(ic,16)}</span><span class="nm">${n}</span><span class="val num">${fmt(v)} / ${lim?'≤ ':''}${fmt(g)} ${u}${can?'<i class="tgchev">›</i>':''}</span><span class="meter"><i class="c-${c}" style="width:${Math.min(100,r*80)}%"></i><em style="left:80%"></em></span></div>${open?tgBreak(k,u):''}`};
+  const tgBreak=(k,u)=>{const tot=t[k]||0;
+    const rows=meals.map(([m,its])=>{const mv=sumItems(its)[k]||0;if(fmt(mv)==='0')return '';
+      const li=its.map(it=>[it,sumItems([it])[k]||0]).filter(([,x])=>fmt(x)!=='0').sort((a,b)=>b[1]-a[1]);
+      return `<div class="tgm"><b>${m}</b><span class="num">${fmt(mv)} ${u}${tot?` · ${Math.round(mv/tot*100)}%`:''}</span></div>${li.map(([it,x])=>`<div class="tgi"><span>${esc(nm(it))}</span><span class="num">${fmt(x)}</span></div>`).join('')}`}).join('');
+    return `<div class="tgbr">${rows||'<div class="says">None from meals this day.</div>'}</div>`};
   AKPI=`<div class="kpi"><button class="kbtn" data-dscore="1" aria-label="See why">${kring(sd.score)}</button><div class="kt">@@NAV@@
       <button class="ksub" data-dscore="1">${lost.map(p=>(p.kind==='lim'?p.n+' over':p.n+' low')).join(' · ')||'No significant deductions'} ›</button></div></div>`;
   return `<section class="panel"><h4>Meals<small class="num">${fmt(t.kcal)} kcal</small></h4>${meals.map(([m,its])=>`<div class="drow"><span class="dm">${m}</span><span>${its.map(it=>esc(nm(it))).join(', ')}</span><span class="num">${fmt(sumItems(its).kcal)}</span></div>`).join('')}</section>
@@ -1977,6 +1989,7 @@ function renderAnalysis(){
     const nv=ev.target.closest('[data-nav]');if(nv&&!nv.disabled){state.off=Math.max(0,state.off+ +nv.dataset.nav);renderAnalysis();return}
     const dt=ev.target.closest('[data-dt]');if(dt){const tm=+dt.dataset.dt;state.per='day';state.off=Math.round((today.getTime()-tm)/864e5);renderAnalysis();return}
     const mo=ev.target.closest('[data-mon]');if(mo){const y=periodRange('year',state.off).from.getFullYear();state.per='month';state.off=(today.getFullYear()-y)*12+today.getMonth()-(+mo.dataset.mon);renderAnalysis();return}
+    const tg=ev.target.closest('[data-tg]');if(tg){const k=state.off+'|'+tg.dataset.tg;state.tgOpen=state.tgOpen===k?null:k;renderAnalysis();return}
     const ds=ev.target.closest('[data-dscore]');if(ds){const d=dayOf(state.off);if(d)openScore(dayTotals(d),d.items,state.off===0,periodRange('day',state.off).label);return}
     const sb=ev.target.closest('[data-s]');if(sb){state.src=sb.dataset.s;renderAnalysis()}};
 }
