@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009111355";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009111659";
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <title>Bony Health</title>
@@ -1519,8 +1519,9 @@ function logWater(text,undo){
   const e=old||{id:nid(),kind:'water'};Object.assign(e,{t:nowT(),text:waterLine(),fresh:true});
   if(!old)state.entries.push(e);else{state.entries=state.entries.filter(x=>x!==e);state.entries.push(e)}
   state.undo=()=>{undo();if(snap)Object.assign(e,snap);else state.entries=state.entries.filter(x=>x!==e)};renderAll();showToast('Saved · '+text)}
-function showToast(msg,undoable=true){$('#toastMsg').textContent=msg;$('#toastUndo').hidden=!undoable;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),4000)}
-$('#toastUndo').addEventListener('click',()=>{if(state.undo){state.undo();state.undo=null;renderAll()}$('#toast').classList.remove('show')});
+let toastAct=null;
+function showToast(msg,undoable=true,act){$('#toastMsg').textContent=msg;$('#toastUndo').hidden=!undoable&&!act;$('#toastUndo').textContent=act?act.label:'Undo';toastAct=act?act.fn:null;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),act?10000:4000)}
+$('#toastUndo').addEventListener('click',()=>{if(toastAct){toastAct();return}if(state.undo){state.undo();state.undo=null;renderAll()}$('#toast').classList.remove('show')});
 $('#openWater').addEventListener('click',()=>openWater());
 
 /* ---------- tabs ---------- */
@@ -1744,7 +1745,7 @@ function openBottleForm(b){
    (gửi lại cùng id không tạo trùng) → mất mạng vẫn ghi được, có mạng tự gửi. */
 const SYNC={meals:{},water:'',weights:{},profile:'',bottles:'',habits:'',summary:''};
 let OUTBOX=[];try{OUTBOX=JSON.parse(localStorage.getItem('bh_outbox')||'[]')||[]}catch(e){}
-let syncErr='',flushing=false,persistT=0,touched=false;
+let syncErr='',flushing=false,persistT=0,touched=false,newData=false,bootAt=0;
 const saveOutbox=()=>{try{localStorage.setItem('bh_outbox',JSON.stringify(OUTBOX))}catch(e){}};
 function syncText(){return OUTBOX.length?`${OUTBOX.length} change${OUTBOX.length>1?'s':''} waiting to sync${syncErr?' · '+syncErr:''}`:'All changes saved'}
 function showSync(){const el=document.getElementById('syncState');if(el)el.textContent=syncText()}
@@ -1766,7 +1767,10 @@ async function flush(){if(flushing||!OUTBOX.length)return;flushing=true;
       if(e.api&&e.message!=='Unauthorized'){OUTBOX.shift();saveOutbox();showToast('Could not save: '+e.message,false);continue}
       setTimeout(flush,20000);break}}}
   finally{flushing=false;showSync()}}
-addEventListener('online',()=>flush());document.addEventListener('visibilitychange',()=>{if(!document.hidden)flush()});
+addEventListener('online',()=>flush());
+// Quay lại app (PWA chạy nền không tự tải lại) → đẩy thay đổi rồi lấy dữ liệu mới, để thấy món nhập trên máy khác
+document.addEventListener('visibilitychange',()=>{if(document.hidden||!LIVE)return;
+  flush().then(()=>{if(OUTBOX.length)return;if(newData)location.reload();else if(Date.now()-bootAt>60000){touched=false;refreshBoot()}})});
 function mealPayload(e){return {id:e.id,date:e.date||TODAY,time:e.t,meal:e.meal,raw_text:e.text,
   items:e.items.map(it=>({fid:it.fid||null,name:it.name||'',qty:it.qty,size:it.size||'M',sugar:it.sugar??null,parts:it.parts||null,guess:!!it.guess,habit:it.habit||'',snap:itemVals(it)}))}}
 const hashOf=o=>JSON.stringify(o);
@@ -1806,11 +1810,13 @@ function liveBoot(){
   flush().then(refreshBoot);
 }
 async function refreshBoot(){
+  bootAt=Date.now();
   try{const j=await api('getBootstrap',{});delete j.__ok;const old=localStorage.getItem('bh_boot'),nw=JSON.stringify(j);
     try{localStorage.setItem('bh_boot',nw)}catch(e){}
     // Có dữ liệu mới (máy khác, sửa trên Sheet, lần mở đầu) và chưa thao tác gì → nạp lại để dựng từ dữ liệu mới
     const strip=x=>{try{const o=JSON.parse(x);delete o.today;delete o.settings;return JSON.stringify(o)}catch(e){return ''}};
-    if(strip(old)!==strip(nw)&&!touched&&!OUTBOX.length)location.reload()}
+    // Đang thao tác dở thì không tự tải lại, chỉ báo và để bạn bấm
+    if(strip(old)!==strip(nw)){if(!touched&&!OUTBOX.length)location.reload();else{newData=true;showToast('New data from your other device',false,{label:'Load',fn:()=>{if(!OUTBOX.length)location.reload();else flush().then(()=>location.reload())}})}}}
   catch(e){if(e.message==='Unauthorized'&&askKey())return refreshBoot();syncErr=e.api?e.message:'offline';showSync()}}
 
 /* ---------- boot ---------- */
