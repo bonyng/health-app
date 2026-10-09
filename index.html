@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1E9E62">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130017";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130129";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -508,6 +508,7 @@ button.sb{cursor:pointer}
 .srow small{color:var(--faint);font-size:11.5px}
 .card .srow{font-size:13px;padding:7px 0}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+html,body{touch-action:pan-x pan-y}button,a,input,label,[data-hold]{touch-action:manipulation}
 </style>
 
 <p class="note"><b>Bony Health · prototype v2.</b> 423 real dishes; history is sample data. Type a meal, tap a question chip, open Insights.</p>
@@ -2173,6 +2174,10 @@ async function refreshBoot(){
     ph.style.height=kb?vv.height+'px':'';ph.style.transform=kb?`translateY(${vv.offsetTop}px)`:''};
   vv.addEventListener('resize',fit);vv.addEventListener('scroll',fit);
   addEventListener('focusin',()=>setTimeout(fit,60));addEventListener('focusout',()=>setTimeout(fit,60))})();
+
+/* Khoá phóng to/thu nhỏ như app thật: iPhone bỏ qua user-scalable=no nên chặn thêm cử chỉ 2 ngón và chạm đúp phóng to. */
+['gesturestart','gesturechange','gestureend'].forEach(t=>document.addEventListener(t,ev=>ev.preventDefault(),{passive:false}));
+document.addEventListener('touchmove',ev=>{if(ev.touches.length>1||(ev.scale&&ev.scale!==1))ev.preventDefault()},{passive:false});
 
 /* ---------- boot ---------- */
 (function boot(){
