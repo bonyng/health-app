@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130932";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009131015";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -926,7 +926,8 @@ function itemFromRow(r){const [,fid,name,qty,size,sug,parts,guess,habit]=r,snap=
 if(LIVE&&BOOT){const byMeal={};(BOOT.items||[]).forEach(r=>(byMeal[r[0]]=byMeal[r[0]]||[]).push(r));
   const days={};for(const [id,date,,meal,,react] of BOOT.meals||[]){if(date>=TODAY)continue;const d=days[date]=days[date]||{date:dOf(date),items:[],water:0};
     (byMeal[id]||[]).forEach(r=>{const it=itemFromRow(r);if(it.fid)d.items.push({...it,meal,react:react||'',mid:id})})}
-  for(const [date,,,ml] of BOOT.water||[])if(date<TODAY){const d=days[date]=days[date]||{date:dOf(date),items:[],water:0};d.water+=+ml||0}
+  for(const [date,bid,count,ml] of BOOT.water||[])if(date<TODAY){const d=days[date]=days[date]||{date:dOf(date),items:[],water:0};d.water+=+ml||0;
+    if(+ml)(d.wsrc=d.wsrc||[]).push([bid,+count||0,+ml])}
   Object.keys(days).sort().forEach(k=>{if(days[k].items.length)HIST.push(days[k])})}
 /* Chat các ngày trước (kéo lên để xem): bản thật lấy từng bữa trên Sheet, bản thử gom lịch sử mẫu theo bữa. */
 const MEAL_T={Breakfast:'07:30',Lunch:'12:15',Drinks:'15:00',Snack:'16:00',Dinner:'19:00','Late night':'22:00'};
@@ -1915,7 +1916,7 @@ function barsSVG(cols,showNum,avg,on){
 function barsHTML(cols,showNum){return `<div class="scorebars" style="grid-template-columns:repeat(${cols.length},1fr);gap:${cols.length>12?2:6}px">${cols.map(c=>c.v==null?`<span class="sb empty"><i></i>${c.l}</span>`:
   `<button class="sb" ${c.attr} aria-label="Score ${c.v}">${showNum?`<b class="num">${c.v}</b>`:''}<i class="c-${zoneCol(c.v)}" style="height:${Math.max(6,c.v*0.78)}px"></i>${c.l}</button>`).join('')}</div>`}
 function dayOf(off){
-  if(off===0)return {date:new Date(today),water:waterNow(),items:state.entries.filter(e=>e.kind==='meal'&&!e.date).flatMap(e=>e.items.map(it=>({...it,meal:e.meal})))};
+  if(off===0)return {date:new Date(today),water:waterNow(),wsrc:[...state.bottles.filter(b=>state.counts[b.id]).map(b=>[b.id,state.counts[b.id],state.counts[b.id]*b.ml]),...(state.extra?[['extra',0,state.extra]]:[])],items:state.entries.filter(e=>e.kind==='meal'&&!e.date).flatMap(e=>e.items.map(it=>({...it,meal:e.meal})))};
   const t=new Date(today);t.setDate(t.getDate()-off);return HIST.find(h=>h.date.getTime()===t.getTime())||null}
 let AKPI='';
 const kring=v=>`<span class="kring"><svg viewBox="0 0 104 104">${ring(46,0,v/100,'#fff','rgba(255,255,255,.22)',10)}</svg><b class="num">${v}</b></span>`;
@@ -1928,8 +1929,15 @@ function renderDay(off){
     ...(t.caffeine_mg>0?[['Caffeine','caffeine_mg',T.cf,'mg',1,'coffee']]:[]),...(hasC('Gout')?[['Purine','purine_mg',T.pu,'mg',1,'shrimp']]:[])];
   const trow=([n,k,g,u,lim,ic])=>{const v=t[k],r=v/g,c=lim?(r<=1?'green':r<=1.15?'amber':'red'):(r>=.9?'green':r>=.6?'amber':'red');
     // Bấm 1 chỉ số (trừ nước) → xem từng bữa, từng món góp bao nhiêu
-    const can=k!=='water',open=can&&state.tgOpen===off+'|'+k;
-    return `<div class="grow${can?' tgrow':''}${open?' on':''}"${can?` data-tg="${k}" role="button" tabindex="0" aria-expanded="${open}"`:''}><span class="gi s-${c}">${svg(ic,16)}</span><span class="nm">${n}</span><span class="val num">${fmt(v)} / ${lim?'≤ ':''}${fmt(g)} ${u}${can?'<i class="tgchev">›</i>':''}</span><span class="meter"><i class="c-${c}" style="width:${Math.min(100,r*80)}%"></i><em style="left:80%"></em></span></div>${open?tgBreak(k,u):''}`};
+    const can=true,open=state.tgOpen===off+'|'+k;
+    return `<div class="grow${can?' tgrow':''}${open?' on':''}"${can?` data-tg="${k}" role="button" tabindex="0" aria-expanded="${open}"`:''}><span class="gi s-${c}">${svg(ic,16)}</span><span class="nm">${n}</span><span class="val num">${fmt(v)} / ${lim?'≤ ':''}${fmt(g)} ${u}${can?'<i class="tgchev">›</i>':''}</span><span class="meter"><i class="c-${c}" style="width:${Math.min(100,r*80)}%"></i><em style="left:80%"></em></span></div>${open?(k==='water'?waterBreak():tgBreak(k,u)):''}`};
+  // Nước = nước đã ghi (chai/ml) + nước trong đồ uống, canh, súp đã ăn
+  const waterBreak=()=>{const f=x=>fmt(x)+' ml',bn=id=>{const b=state.bottles.find(x=>x.id===id);return b?b.name:id==='extra'?'Other water':'Bottle'};
+    const logged=(d.wsrc||[]).map(([id,c,ml])=>`<div class="tgi"><span>${esc(bn(id))}${c&&id!=='extra'?` × ${fmt1(c)}`:''}</span><span class="num">${fmt(ml)}</span></div>`).join('')
+      ||(d.water?`<div class="tgi"><span>Water logged</span><span class="num">${fmt(d.water)}</span></div>`:'');
+    const fm=meals.map(([m,its])=>{const by={};flat(its).forEach(it=>{const x=sumItems([it]).volume_ml||0;if(!x)return;const key=it.fid||it.name;if(by[key])by[key][1]+=x;else by[key]=[it,x]});
+      return Object.values(by).map(([it,x])=>`<div class="tgi"><span>${esc(nm(it))} · ${m}</span><span class="num">${fmt(x)}</span></div>`).join('')}).join(''),fv=t.volume_ml||0;
+    return `<div class="tgbr">${d.water?`<div class="tgm"><b>Water</b><span class="num">${f(d.water)}</span></div>${logged}`:''}${fv?`<div class="tgm"><b>From drinks &amp; soups</b><span class="num">${f(fv)}</span></div>${fm}`:''}${!d.water&&!fv?'<div class="says">No water logged this day.</div>':''}</div>`};
   const tgBreak=(k,u)=>{const tot=t[k]||0,f=x=>x<10?fmt1(x):fmt(x);
     const rows=meals.map(([m,its])=>{const mv=sumItems(its)[k]||0;if(mv<.05)return '';
       // Tách thành phần của món (bún + rau sống + đậu hũ…) để thấy chất nào đến từ đâu; gộp món trùng
