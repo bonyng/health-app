@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009131125";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009131243";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -1885,7 +1885,9 @@ function periodRange(per,off){const t=today;let from,to,label;
   else if(per==='month'){from=new Date(t.getFullYear(),t.getMonth()-off,1);to=new Date(from.getFullYear(),from.getMonth()+1,0);label=MON[from.getMonth()]+' '+from.getFullYear()}
   else{from=new Date(t.getFullYear()-off,0,1);to=new Date(from.getFullYear(),11,31);label=String(from.getFullYear())}
   return {from,to,label}}
-const histIn=r=>HIST.filter(d=>d.date>=r.from&&d.date<=r.to);
+// Kỳ tuần/tháng/năm gồm cả hôm nay (tính đến giờ này) → tuần đầu dùng app vẫn có số liệu
+const histIn=r=>{const out=HIST.filter(d=>d.date>=r.from&&d.date<=r.to&&d.date<today);
+  if(today>=r.from&&today<=r.to){const t=dayOf(0);if(t.items.length)out.push(t)}return out};
 const avgOf=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
 /* Ngưỡng tính "ngày vượt" theo mục tiêu cá nhân; dòng liên quan bệnh nền in đậm. */
 function overRows(tots){
@@ -1898,9 +1900,9 @@ function topCount(days,drink){const m={};
     if(f.category==='topping'||f.category==='nuoc_cham'||isDrink(f)!==drink)continue;m[it.fid]=(m[it.fid]||0)+it.qty}
   return Object.entries(m).sort((a,b)=>b[1]-a[1])}
 function scoreBars(per,r,days){
-  const sc=d=>score(dayTotals(d),false,d.items);
+  const sc=d=>score(dayTotals(d),d.date.getTime()===today.getTime(),d.items);
   if(per==='year'){const cols=[...Array(12)].map((_,m)=>{const ds=days.filter(d=>d.date.getMonth()===m);return {v:avgOf(ds.map(sc)),l:MON[m],attr:`data-mon="${m}"`}});return cols}
-  const last=r.to<today?r.to:yday(),out=[],byT=new Map(days.map(d=>[d.date.getTime(),d]));
+  const last=r.to<today?r.to:today,out=[],byT=new Map(days.map(d=>[d.date.getTime(),d]));
   for(let d=new Date(r.from);d<=r.to;d.setDate(d.getDate()+1)){const h=d<=last?byT.get(d.getTime()):null;
     out.push({v:h?sc(h):null,l:per==='week'?DOW[d.getDay()]:([1,8,15,22,29].includes(d.getDate())?d.getDate():''),attr:h?`data-dt="${d.getTime()}"`:''})}
   return out}
@@ -1977,7 +1979,7 @@ function renderAnalysis(){
       const SRC=[['sugar_g','Sugar','g'],['sodium_mg','Sodium','mg'],['purine_mg','Purine','mg'],['kcal','Calories','kcal'],['caffeine_mg','Caffeine','mg']];
       const sr=a.src[state.src],top=sr.list.slice(0,5),rest=Math.max(0,1-top.reduce((x,y)=>x+y.p,0)),COLS=['#2477E8','#1E9E62','#C98512','#D2453D','#7A8C86'];
       AKPI=`<div class="kpi">${kring(cur)}<div class="kt">@@NAV@@
-            <small class="num">Avg ${dlt!=null?`<span class="delta">${dlt>0?'▲':dlt<0?'▼':'='} ${Math.abs(dlt)||''}</span> vs ${PREV_LBL[per]} · `:''}${N} days logged</small></div></div>
+            <small class="num">Avg ${dlt!=null?`<span class="delta">${dlt>0?'▲':dlt<0?'▼':'='} ${Math.abs(dlt)||''}</span> vs ${PREV_LBL[per]} · `:''}${N} day${N>1?'s':''} logged</small></div></div>
           ${barsSVG(cols,false,cur,true)}`;
       body=`<section class="panel"><h4>Days over limit<small>Bold = your condition</small></h4>${over.filter(x=>x.c>0).slice(0,4).map(orow).join('')||'<div class="says">No days over.</div>'}</section>
         <section class="panel"><h4>Top foods<small>${pdays.length?'vs '+PREV_LBL[per]:''}</small></h4>${trows(tf.slice(0,3),pf)}
