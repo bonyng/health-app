@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130451";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009130728";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -196,12 +196,14 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 
 /* composer */
 .tray{flex:none;margin:8px 12px 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:10px 12px;display:grid;gap:8px;box-shadow:0 6px 18px rgba(16,48,42,.08)}
-.tray-h{display:flex;justify-content:space-between;align-items:center;gap:8px}
+/* Con của grid mặc định không co nhỏ hơn nội dung → hàng bữa ăn/ nút Save đẩy card rộng ra ngoài màn hình */
+.tray{grid-template-columns:minmax(0,1fr)}.tray>*{min-width:0}
+.tray-h{display:flex;justify-content:space-between;align-items:center;gap:8px}.tray-h .eyebrow{flex:none}.tray-h .mealpick{min-width:0}
 .mealpick{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .mealpick button{flex:none;font-size:11.5px;font-weight:600;border-radius:999px;padding:3px 9px;color:var(--faint);background:var(--raised)}
 .mealpick button[aria-pressed="true"]{background:var(--brand);color:#fff}
-.tray-f{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.tray-b{display:flex;gap:6px}
+.tray-f{display:flex;justify-content:space-between;align-items:center;gap:8px}.tray-f .foods{flex:1;min-width:0;line-height:1.35}
+.tray-b{display:flex;gap:6px;flex:none}
 .seg.s3{grid-template-columns:repeat(3,1fr)}
 .sg svg{color:var(--green)}
 .qchips{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;scrollbar-width:none;flex:none;background:var(--bg)}
