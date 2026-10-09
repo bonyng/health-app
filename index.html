@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009131015";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009131125";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -406,7 +406,7 @@ button.sb{cursor:pointer}
 .tgchev{font-style:normal;display:inline-block;margin-left:6px;color:var(--faint);transition:transform .15s}.tgrow.on .tgchev{transform:rotate(90deg)}
 .tgbr{margin:2px 0 6px 38px;padding:6px 10px;border-left:2px solid var(--line);display:grid;gap:3px}
 .tgm{display:flex;justify-content:space-between;gap:10px;font-size:13px;margin-top:4px}.tgm:first-child{margin-top:0}.tgm span{color:var(--muted);font-size:12.5px}
-.tgi{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--muted);padding-left:8px}.tgi span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tgi{display:flex;justify-content:space-between;gap:10px;font-size:13px}.tgi .num{color:var(--muted);font-size:12.5px;flex:none}.tgm+.tgi{margin-top:0}.tgm~.tgi{padding-left:8px}.tgi span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .grow .nm{font-size:13.5px;font-weight:500}
 .grow .val{font-size:12.5px;color:var(--muted);text-align:right}
 .grow .meter,.orow .meter{grid-column:2/-1;height:6px;border-radius:6px;background:var(--sunken);position:relative;margin-top:-4px}
@@ -1935,16 +1935,13 @@ function renderDay(off){
   const waterBreak=()=>{const f=x=>fmt(x)+' ml',bn=id=>{const b=state.bottles.find(x=>x.id===id);return b?b.name:id==='extra'?'Other water':'Bottle'};
     const logged=(d.wsrc||[]).map(([id,c,ml])=>`<div class="tgi"><span>${esc(bn(id))}${c&&id!=='extra'?` × ${fmt1(c)}`:''}</span><span class="num">${fmt(ml)}</span></div>`).join('')
       ||(d.water?`<div class="tgi"><span>Water logged</span><span class="num">${fmt(d.water)}</span></div>`:'');
-    const fm=meals.map(([m,its])=>{const by={};flat(its).forEach(it=>{const x=sumItems([it]).volume_ml||0;if(!x)return;const key=it.fid||it.name;if(by[key])by[key][1]+=x;else by[key]=[it,x]});
-      return Object.values(by).map(([it,x])=>`<div class="tgi"><span>${esc(nm(it))} · ${m}</span><span class="num">${fmt(x)}</span></div>`).join('')}).join(''),fv=t.volume_ml||0;
+    const fm=byFood(d.items,it=>sumItems([it]).volume_ml||0).map(([it,x])=>`<div class="tgi"><span>${esc(nm(it))}</span><span class="num">${fmt(x)}</span></div>`).join(''),fv=t.volume_ml||0;
     return `<div class="tgbr">${d.water?`<div class="tgm"><b>Water</b><span class="num">${f(d.water)}</span></div>${logged}`:''}${fv?`<div class="tgm"><b>From drinks &amp; soups</b><span class="num">${f(fv)}</span></div>${fm}`:''}${!d.water&&!fv?'<div class="says">No water logged this day.</div>':''}</div>`};
-  const tgBreak=(k,u)=>{const tot=t[k]||0,f=x=>x<10?fmt1(x):fmt(x);
-    const rows=meals.map(([m,its])=>{const mv=sumItems(its)[k]||0;if(mv<.05)return '';
-      // Tách thành phần của món (bún + rau sống + đậu hũ…) để thấy chất nào đến từ đâu; gộp món trùng
-      const by={};flat(its).forEach(it=>{const key=it.fid||it.name,x=sumItems([it])[k]||0;if(by[key])by[key][1]+=x;else by[key]=[it,x]});
-      const li=Object.values(by).filter(([,x])=>x>=.05).sort((a,b)=>b[1]-a[1]);
-      return `<div class="tgm"><b>${m}</b><span class="num">${f(mv)} ${u}${tot?` · ${Math.round(mv/tot*100)}%`:''}</span></div>${li.map(([it,x])=>`<div class="tgi"><span>${esc(nm(it))}</span><span class="num">${f(x)}</span></div>`).join('')}`}).join('');
-    return `<div class="tgbr">${rows||'<div class="says">None from meals this day.</div>'}</div>`};
+  // Gộp cả ngày theo món/nguyên liệu (tách thành phần: bún + rau sống + đậu hũ…), không chia theo bữa
+  const byFood=(items,val)=>{const by={};flat(items).forEach(it=>{const key=it.fid||it.name,x=val(it);if(x<.05)return;if(by[key])by[key][1]+=x;else by[key]=[it,x]});
+    return Object.values(by).sort((a,b)=>b[1]-a[1])};
+  const tgBreak=(k,u)=>{const f=x=>x<10?fmt1(x):fmt(x),li=byFood(d.items,it=>sumItems([it])[k]||0);
+    return `<div class="tgbr">${li.map(([it,x])=>`<div class="tgi"><span>${esc(nm(it))}</span><span class="num">${f(x)} ${u}</span></div>`).join('')||'<div class="says">None from food this day.</div>'}</div>`};
   AKPI=`<div class="kpi"><button class="kbtn" data-dscore="1" aria-label="See why">${kring(sd.score)}</button><div class="kt">@@NAV@@
       <button class="ksub" data-dscore="1">${lost.map(p=>(p.kind==='lim'?p.n+' over':p.n+' low')).join(' · ')||'No significant deductions'} ›</button></div></div>`;
   return `<section class="panel"><h4>Meals<small class="num">${fmt(t.kcal)} kcal</small></h4>${meals.map(([m,its])=>`<div class="drow"><span class="dm">${m}</span><span>${its.map(it=>esc(nm(it))).join(', ')}</span><span class="num">${fmt(sumItems(its).kcal)}</span></div>`).join('')}</section>
