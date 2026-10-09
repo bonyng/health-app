@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009132139";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009132650";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -1366,7 +1366,17 @@ function recentMeals(){
   for(const d of PAST){if(d.iso<cut)continue;for(const m of d.meals){if(!m.text||!(m.meal===slot||(slot==='Snack'&&m.meal==='Drinks')))continue;const k=norm(m.text);if(seen.has(k))continue;
     const c=cnt[k]=cnt[k]||{text:m.text,n:0,last:''};c.n++;c.last=d.iso}}
   return Object.values(cnt).sort((a,b)=>b.n-a.n||b.last.localeCompare(a.last)).slice(0,4)}
+/* Đang nhắm một bữa (vuốt) → hàng gợi ý đổi thành các lệnh sửa cho đúng bữa đó, thay cho "What to eat now?". */
+function editChips(e){const its=e.items.filter(x=>x&&x.fid&&!x.guess),last=its.at(-1),out=[];if(!last)return out;
+  const sd=[...its].reverse().find(x=>sugarAdj(FOOD[x.fid]));
+  if(sd){if(sd.sugar!==0)out.push(['không đường','No sugar']);if(sd.sugar==null||sd.sugar>50)out.push(['ít đường','Less sugar'])}
+  const f=FOOD[last.fid];if(last.size!=='L')out.push(['size L',isDrink(f)?'Size L':'Bigger']);if(last.size!=='S')out.push(['size S',isDrink(f)?'Size S':'Smaller']);
+  quickFor(last).slice(0,3).forEach(id=>out.push(['thêm '+(FOOD[id].al[0]||norm(shortName(FOOD[id]))),'+ '+shortName(FOOD[id])]));
+  (last.parts||[]).filter(p=>p.on&&p.fid!==last.fid&&FOOD[p.fid]).slice(0,3).forEach(p=>out.push(['bỏ '+(FOOD[p.fid].al[0]||norm(shortName(FOOD[p.fid]))),'− '+shortName(FOOD[p.fid])]));
+  return out}
 function renderQ(){
+  const tg=!state.editing&&state.target&&state.entries.find(x=>x.id===state.target&&x.kind==='meal');
+  if(tg){$('#qchips').innerHTML=editChips(tg).map(([c,l])=>`<button class="qchip" data-ec="${esc(c)}">${svg('pencil',13)}${esc(l)}</button>`).join('');return}
   const Q=[['now','What to eat now?'],['drink','What to drink now?'],['menu','Meal ideas'],['gap','Gaps this week?'],['trasua','Milk tea count?'],['sugar','Sugar sources?'],['report','Weekly report']];
   $('#qchips').innerHTML=recentMeals().map(r=>`<button class="qchip rc" data-rt="${esc(r.text)}" title="Logged ${r.n}× around this time">${svg('repeat',13)}<span>${esc(r.text)}</span></button>`).join('')+
     Q.map(([k,l])=>`<button class="qchip" data-q="${k}">${svg('spark',13)}${l}</button>`).join('');
@@ -1527,7 +1537,8 @@ $('#suggest').addEventListener('click',ev=>{const b=ev.target.closest('[data-f]'
   const raw=$('#say').value,cut=Math.max(raw.lastIndexOf(','),raw.lastIndexOf(';')),head=raw.slice(0,cut+1),last=raw.slice(cut+1);
   const lead=(last.match(/^\s*((?:ăn|uống|an|uong)\s+)?((?:sáng|trưa|tối|xế|khuya|sang|trua|toi|xe)\s+)?/i)||[''])[0];
   $('#say').value=(head+' '+lead+shortName(FOOD[b.dataset.f])).replace(/\s+/g,' ').trimStart()+', ';hideSuggest();$('#say').focus()});
-$('#qchips').addEventListener('click',ev=>{const rt=ev.target.closest('[data-rt]');if(rt){if(state.editing||state.target){state.editing=null;state.target=null;renderEditbar()}$('#say').value=rt.dataset.rt;$('#composer').requestSubmit();return}
+$('#qchips').addEventListener('click',ev=>{const ec=ev.target.closest('[data-ec]');if(ec){$('#say').value=ec.dataset.ec;$('#composer').requestSubmit();return}
+  const rt=ev.target.closest('[data-rt]');if(rt){if(state.editing||state.target){state.editing=null;state.target=null;renderEditbar()}$('#say').value=rt.dataset.rt;$('#composer').requestSubmit();return}
   const b=ev.target.closest('.qchip');if(!b)return;const q=b.dataset.q;
   if(q==='now'){handleSuggestText('an gi',b.textContent);return}
   if(q==='drink'){askDrink(b.textContent);return}
@@ -1796,11 +1807,11 @@ function renderEditbar(){const el=$('#editbar'),e=state.editing&&state.entries.f
   if(tg){el.hidden=false;el.innerHTML=`${svg('pencil',14)}<span>Next message changes · ${esc(tg.meal)} ${esc(tg.t)}</span><button type="button" data-x="1" aria-label="Cancel">✕</button>`;return}
   if(!e){state.editing=null;el.hidden=true;return}
   el.hidden=false;el.innerHTML=`${svg('pencil',14)}<span>Editing · ${esc(e.meal)} ${esc(e.t)}</span><button type="button" data-x="1" aria-label="Cancel edit">✕</button>`}
-$('#editbar').addEventListener('click',ev=>{if(ev.target.closest('[data-x]')){const t=state.target;state.editing=null;state.target=null;$('#say').value='';renderEditbar();if(t)renderTimeline()}});
+$('#editbar').addEventListener('click',ev=>{if(ev.target.closest('[data-x]')){const t=state.target;state.editing=null;state.target=null;$('#say').value='';renderEditbar();if(t){renderQ();renderTimeline()}}});
 function aimMeal(id){const e=state.entries.find(x=>x.id===id&&x.kind==='meal');if(!e)return;state.hold=null;state.editing=null;
-  state.target=state.target===id?null:id;if(navigator.vibrate)navigator.vibrate(10);renderEditbar();renderTimeline();if(state.target)$('#say').focus()}
+  state.target=state.target===id?null:id;if(navigator.vibrate)navigator.vibrate(10);renderEditbar();renderQ();renderTimeline();if(state.target)$('#say').focus()}
 function startEdit(id){const e=state.entries.find(x=>x.id===id);if(!e)return;state.hold=null;state.editing=id;state.target=null;
-  $('#say').value=e.text;renderEditbar();renderTimeline();$('#say').focus()}
+  $("#say").value=e.text;renderEditbar();renderQ();renderTimeline();$('#say').focus()}
 function applyEdit(v){const e=state.entries.find(x=>x.id===state.editing);state.editing=null;renderEditbar();if(!e||v===e.text)return;
   const p=parse(v,Math.floor((toMin(e.t)??720)/60));if(!p.items.length){showToast('No food recognized',false);return}
   const snap={text:e.text,items:e.items};e.text=v;e.items=p.items.map(autoGuess).map(applyHabits);
