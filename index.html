@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009132650";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009135548";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -193,6 +193,14 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .foods{font-size:12.5px;color:var(--muted)}
 .foods b{color:var(--ink);font-weight:600}
 .linkbtn{font-size:12.5px;font-weight:600;color:var(--blue)}
+.aiv{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:9px;min-width:0}
+.card h5+.aiv,.panel .aiv{border-top:0;padding-top:0}
+.aiv>.says svg{vertical-align:-2px;color:var(--blue)}
+.aih{display:flex;gap:7px;align-items:flex-start;font-size:13.5px;line-height:1.38}.aih svg{flex:none;margin-top:2px;color:var(--blue)}
+.aig .k{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}.aig .k.green{color:var(--green)}.aig .k.amber{color:var(--amber)}.aig .k.blue{color:var(--blue)}
+.aig ul{margin:3px 0 0;padding-left:18px;font-size:13px;line-height:1.42}.aig li+li{margin-top:3px}
+.aif{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;color:var(--faint)}
+.aiv .btn-s{justify-self:start}
 
 /* composer */
 .tray{flex:none;margin:8px 12px 0;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:10px 12px;display:grid;gap:8px;box-shadow:0 6px 18px rgba(16,48,42,.08)}
@@ -1231,11 +1239,49 @@ function menuCard(){
   const gp=(m.gp.length?m.gp.slice(0,3).map(x=>x.n.toLowerCase()):condFocus()).join(', ');
   return `<div class="card"><h5>Meal ideas for today<small>Tap a meal for details</small></h5>${gp?`<div class="foods">Focus on: <b>${gp}</b></div>`:''}<div class="mlist">${rows}</div></div>`;
 }
+/* ---------- Báo cáo tuần + nhận xét do AI viết (Gemini) ----------
+   Tuần báo cáo = tuần trước; tối Chủ nhật (từ 18h) = tuần này. Chỉ gửi số tổng hợp của tuần (% mục tiêu, nhóm thực phẩm,
+   món/đồ uống hay dùng) — không gửi hồ sơ, bệnh nền, cân nặng. Bản viết lưu ở Settings "review_<thứ Hai>" và máy này. */
+const REV={},revSt={},revTried=new Set();
+try{Object.assign(REV,JSON.parse(localStorage.getItem('bh_rev')||'{}'))}catch(e){}
+if(BOOT&&BOOT.settings)for(const k in BOOT.settings){const v=BOOT.settings[k];if(k.startsWith('review_')&&v&&v.headline)REV[k.slice(7)]=v}
+const revWeek=()=>{const off=today.getDay()===0&&new Date().getHours()>=18?0:1,r=periodRange('week',off);return {off,r,key:isoD(r.from)}};
+const wkRange=key=>{const [y,m,d]=key.split('-').map(Number);return {from:new Date(y,m-1,d),to:new Date(y,m-1,d+6)}};
+function weekData(days,pdays){const a=analyseDays(days),nm=id=>shortName(FOOD[id]);
+  const M=[['Calories','kcal',T.kcal,'kcal',1],['Sodium','sodium_mg',T.na,'mg',1],['Sugar','sugar_g',T.su,'g',1],['Saturated fat','satfat_g',T.sat,'g',1],
+    ['Caffeine','caffeine_mg',T.cf,'mg',1],['Water','water',T.water,'ml',0],['Protein','protein_g',T.pro,'g',0],['Fiber','fiber_g',T.fib,'g',0],['Vegetables','veg_g',150,'g',0]];
+  return {days:days.length,score:avgOf(a.scores),prev_score:pdays.length?avgOf(analyseDays(pdays).scores):null,
+    metrics:M.filter(([,k,,,lim])=>!lim||a.avg[k]>0).map(([name,k,target,unit,lim])=>({name,avg:Math.round(a.avg[k]),target:Math.round(target),unit,lim:!!lim})),
+    groups:GROUPS.map(G=>({name:G.n,count:a.g[G.k].c,goal:a.g[G.k].goal,per:G.per==='serv'?'meals':'days'})),
+    foods:topCount(days,false).slice(0,8).map(([id,c])=>({name:nm(id),times:Math.round(c*10)/10})),
+    drinks:topCount(days,true).slice(0,6).map(([id,c])=>({name:nm(id),times:Math.round(c*10)/10})),
+    tags:TAGS.filter(([k])=>a.tag[k]>0).map(([k,name])=>({name,times:Math.round(a.tag[k]*10)/10}))}}
+async function fetchReview(key,force){if(!LIVE||revSt[key]==='busy')return;
+  const r=wkRange(key),days=histIn(r);if(days.length<3)return;
+  const pr={from:new Date(r.from.getFullYear(),r.from.getMonth(),r.from.getDate()-7),to:new Date(r.from.getFullYear(),r.from.getMonth(),r.from.getDate()-1)};
+  revSt[key]='busy';rerenderRev();
+  try{const j=await api('weeklyReview',{week:key,force:!!force,data:weekData(days,histIn(pr))});REV[key]=j.review;delete revSt[key];
+    try{localStorage.setItem('bh_rev',JSON.stringify(REV))}catch(e){}}
+  catch(e){revSt[key]=e.message==='GEMINI_QUOTA'?'AI is busy right now':e.api?'Could not write it ('+e.message+')':'You are offline'}
+  rerenderRev()}
+function rerenderRev(){renderTimeline();if(state.tab==='Analysis')renderAnalysis()}
+function reviewHTML(key,n){const v=REV[key],st=revSt[key];
+  if(v)return `<div class="aiv"><div class="aih">${svg('spark',14)}<b>${esc(v.headline)}</b></div>
+    ${[['Went well',v.wins,'green'],['To fix',v.fixes,'amber'],['Next week',v.next_week,'blue']].filter(x=>x[1]&&x[1].length).map(([h,l,c])=>`<div class="aig"><span class="k ${c}">${h}</span><ul>${l.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}
+    <div class="aif"><span>Written by AI from your weekly totals${v.days&&n>v.days?` · ${n-v.days} more day${n-v.days>1?'s':''} logged since`:''}</span>${LIVE?`<button class="linkbtn" data-rev="${key}" data-force="1"${st==='busy'?' disabled':''}>${st==='busy'?'Writing…':'Rewrite'}</button>`:''}</div>${st&&st!=='busy'?`<div class="aif">${esc(st)}</div>`:''}</div>`;
+  if(!LIVE)return '';
+  if(n<3)return `<div class="aiv says">The AI review needs at least 3 logged days in the week.</div>`;
+  if(st==='busy')return `<div class="aiv says">${svg('spark',14)} Writing your weekly review…</div>`;
+  return `<div class="aiv"><div class="says">${st?esc(st)+'.':'A short review of your week, written by AI from your weekly totals.'}</div><button class="btn-s" data-rev="${key}">${st?'Try again':'Write AI review'}</button></div>`}
 function reportCard(){
-  const a=analyse(7),gp=gaps(a).slice(0,3),su=a.src.sugar_g.list[0],ts=a.tag.tra_sua,prev=analyse(7,7).tag.tra_sua;
-  return `<div class="card"><h5>7-day report<small class="num">Avg score ${Math.round(a.scores.reduce((x,y)=>x+y,0)/a.scores.length)}</small></h5>
+  const {off,r,key}=revWeek(),days=histIn(r),pdays=histIn(periodRange('week',off+1));
+  if(!days.length)return `<div class="card"><h5>Weekly report<small class="num">${ddmm(r.from)}–${ddmm(r.to)}</small></h5><div class="says">Nothing logged that week.</div></div>`;
+  const a=analyseDays(days),prev=analyseDays(pdays),gp=gaps(a).slice(0,3),su=a.src.sugar_g.list[0];
+  if(LIVE&&days.length>=3&&!REV[key]&&!revSt[key]&&!revTried.has(key)){revTried.add(key);setTimeout(()=>fetchReview(key),0)}
+  return `<div class="card"><h5>${off?'Last week':'This week'}<small class="num">${ddmm(r.from)}–${ddmm(r.to)} · avg score ${avgOf(a.scores)}</small></h5>
+   ${reviewHTML(key,days.length)}
    <div class="list">${gp.map(x=>`<div class="li"><span><b>${x.n}</b> · <span class="foods">${x.txt}</span></span><span class="foods num">${Math.round(x.r*100)}%</span><span class="bar"><i class="${x.r<.5?'red':'amber'}" style="width:${Math.max(4,x.r*100)}%"></i></span><span class="foods" style="grid-column:1/-1">Add: <b>${names(SUGG[x.key]||[]).join(', ')}</b></span></div>`).join('')}</div>
-   <div class="says num">Milk tea <b>${ts}×</b> (last week ${prev}) · most sugar from <b>${su?esc(su.nm):'—'}</b> (${su?Math.round(su.p*100):0}%)</div>
+   <div class="says num">Milk tea <b>${fmt1(a.tag.tra_sua)}×</b>${pdays.length?` (week before ${fmt1(prev.tag.tra_sua)})`:''} · most sugar from <b>${su?esc(su.nm):'—'}</b> (${su?Math.round(su.p*100):0}%)</div>
    <button class="linkbtn" data-goto="Analysis">See full insights →</button></div>`;
 }
 function answerCard(q){
@@ -1555,6 +1601,7 @@ $('#timeline').addEventListener('click',ev=>{
   if(ev.target.closest('[data-earlier]')){loadEarlier(3);return}
   const jp=ev.target.closest('[data-jump]');if(jp){const [k,d]=jp.dataset.jump.split('|');jumpTo(k,d);return}
   const sa=ev.target.closest('[data-sall]');if(sa){openSearch(sa.dataset.sall);return}
+  const rv=ev.target.closest('[data-rev]');if(rv){if(!rv.disabled)fetchReview(rv.dataset.rev,!!rv.dataset.force);return}
   const g=ev.target.closest('[data-goto]');if(g){switchTab(g.dataset.goto);return}
   const se=ev.target.closest('[data-seat]');if(se){const [id,i]=se.dataset.seat.split('|'),c=state.entries.find(x=>x.id===id),o=c&&c.shown&&c.shown[+i];if(!o)return;
     c.done[o.name]=true;const e=addMeal(o.name,nowT(),new Date().getHours(),{meal:c.meal,items:JSON.parse(JSON.stringify(o.items))});
@@ -2024,7 +2071,8 @@ function renderAnalysis(){
       AKPI=`<div class="kpi">${kring(cur)}<div class="kt">@@NAV@@
             <small class="num">Avg ${dlt!=null?`<span class="delta">${dlt>0?'▲':dlt<0?'▼':'='} ${Math.abs(dlt)||''}</span> vs ${PREV_LBL[per]} · `:''}${N} day${N>1?'s':''} logged</small></div></div>
           ${barsSVG(cols,false,cur,true)}`;
-      body=`<section class="panel"><h4>Days over limit<small>Bold = your condition</small></h4>${over.filter(x=>x.c>0).slice(0,4).map(orow).join('')||'<div class="says">No days over.</div>'}</section>
+      const rk=isoD(r.from),showRev=per==='week'&&(LIVE||REV[rk])&&(off>0||(today.getDay()===0&&new Date().getHours()>=18)||REV[rk]);
+      body=(showRev?`<section class="panel"><h4>AI review<small>${N} day${N>1?'s':''} logged</small></h4>${reviewHTML(rk,N)}</section>`:'')+`<section class="panel"><h4>Days over limit<small>Bold = your condition</small></h4>${over.filter(x=>x.c>0).slice(0,4).map(orow).join('')||'<div class="says">No days over.</div>'}</section>
         <section class="panel"><h4>Top foods<small>${pdays.length?'vs '+PREV_LBL[per]:''}</small></h4>${trows(tf.slice(0,3),pf)}
           <div class="eyebrow" style="margin-top:10px">Top drinks</div>${trows(td.slice(0,3),pd)||'<div class="says">None yet.</div>'}</section>
         ${tastePanel(days)}${rxPanel(days)}<section class="panel"><h4>Food groups<small>Line = target</small></h4>${grows}</section>
@@ -2038,6 +2086,7 @@ function renderAnalysis(){
   }
   $('#scrAnalysis').innerHTML=`<div class="pad"><section class="ahero">${head}${AKPI?AKPI.replace('@@NAV@@',nav):nav}</section>${body}</div>`;
   $('#scrAnalysis').onclick=ev=>{
+    const rv=ev.target.closest('[data-rev]');if(rv){if(!rv.disabled)fetchReview(rv.dataset.rev,!!rv.dataset.force);return}
     if(ev.target.closest('[data-more]')){state.more=!state.more;renderAnalysis();return}
     const pb=ev.target.closest('[data-per]');if(pb){state.per=pb.dataset.per;state.off=0;renderAnalysis();return}
     const nv=ev.target.closest('[data-nav]');if(nv&&!nv.disabled){state.off=Math.max(0,state.off+ +nv.dataset.nav);renderAnalysis();return}
@@ -2257,7 +2306,8 @@ document.addEventListener('touchmove',ev=>{if(ev.touches.length>1||(ev.scale&&ev
   state.entries.push({id:nid(),kind:'water',t:'08:30',text:'Water: 1 blue bottle · total 700 ml'});
   addMeal('ăn trưa bánh hỏi, nem nướng, thịt heo quay, rau thơm, dưa leo, nước mắm','12:20',12);
   addMeal('Uống trà sửa tấm olong và trân châu giòn','15:10',15);}
-  if(new Date().getDay()===0&&HIST.filter(h=>h.date>=new Date(today-7*864e5)).length>=3)state.entries.push({id:nid(),kind:'card',type:'report',t:'08:00'});
+  // Báo cáo tuần tự hiện: tối Chủ nhật (tuần này) và thứ Hai (tuần trước)
+  {const w=revWeek(),dw=today.getDay();if((dw===1||(dw===0&&!w.off))&&histIn(w.r).length>=3)state.entries.push({id:nid(),kind:'card',type:'report',t:dw?'08:00':'18:00'})}
   state.entries.forEach(e=>e.fresh=false);
   renderQ();renderAll();
 })();
