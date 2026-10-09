@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009092718";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009111355";
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <title>Bony Health</title>
@@ -949,14 +949,14 @@ function mealBudget(meal,useToday){
     veg:main?(meal==='Breakfast'?60:150):0,pro:main?T.pro*sh*.85:0,fib:main?T.fib*sh*.7:0}}
 const freeSugarOf=items=>sumItems(items.filter(it=>{const f=FOOD[it.fid];return !(f.groups.includes('trai_cay')||/khong_duong/.test(it.fid))})).sugar_g;
 function evalOpt(items,B){const v=sumItems(items),fails=[],goods=[];let pen=0;
-  const over=(x,cap,lbl,u,w)=>{if(x>cap){pen+=(x-cap)/cap*w;if(x>cap*1.1)fails.push(`${lbl} ${fmt(x)}${u} (limit ${fmt(cap)}${u})`)}};
+  const over=(x,cap,lbl,u,w)=>{if(x>cap){pen+=(x-cap)/cap*w;if(x>cap*1.1)fails.push(`${lbl} ${fmt(x)}/${fmt(cap)}${u}`)}};
   over(v.sodium_mg,B.na,'Sodium',' mg',60);if(B.pu<Infinity)over(v.purine_mg,B.pu,'Purine',' mg',60);
-  over(freeSugarOf(items),B.su,'Sugar',' g',hasC('Prediabetes')?50:30);over(v.satfat_g,B.sat,'Saturated fat',' g',hasC('High cholesterol')?40:20);
+  over(freeSugarOf(items),B.su,'Sugar',' g',hasC('Prediabetes')?50:30);over(v.satfat_g,B.sat,'Sat fat',' g',hasC('High cholesterol')?40:20);
   pen+=Math.max(0,v.kcal-B.kcal*1.15)/B.kcal*50+Math.max(0,B.kcal*.55-v.kcal)/B.kcal*20;
   const need=(x,goal,w,lbl)=>{if(!goal)return;const r=Math.min(1,x/goal);pen+=(1-r)*w;if(r>=1)goods.push(lbl)};
   need(v.veg_g,B.veg,15,B.veg>=150?'½ plate veg':'some veg');need(v.protein_g,B.pro,12,fmt(v.protein_g)+' g protein');
   need(v.fiber_g,B.fib,hasC('Prediabetes')||hasC('High cholesterol')?12:8,fmt(v.fiber_g)+' g fiber');
-  if(hasC('Gout')&&items.some(it=>['noi_tang','hai_san_vo'].some(t=>FOOD[it.fid].tags.includes(t)))){pen+=100;fails.unshift('Organ meat / shellfish (gout)')}
+  if(hasC('Gout')&&items.some(it=>['noi_tang','hai_san_vo'].some(t=>FOOD[it.fid].tags.includes(t)))){pen+=100;fails.unshift('Organ/shellfish (gout)')}
   return {v,pen,fails,goods}}
 function variants(list){
   const base=list.map(id=>withParts({fid:id,qty:1,size:'M'})),out=[{items:base,tip:tipFor(list)}],lite=JSON.parse(JSON.stringify(base)),ch=new Set();
@@ -987,11 +987,10 @@ function rankMeal(meal,mode,useToday,exclude=new Set()){
     if(o.fav)sc+=3;if(c.ids.some(id=>recent.has(id)&&BASE_CAT.has(FOOD[id].category)))sc-=6;
     o.sc=sc;o.kcal=o.v.kcal;o.name=(c.name||c.ids.map(id=>shortName(FOOD[id])).join(' + '))+(o.side?' + '+shortName(FOOD[o.side]):'');
     o.tip=[c.tip,o.side?(SOUP_SIDES.includes(o.side)?'ask for extra '+shortName(FOOD[o.side]).toLowerCase():'add a side of '+shortName(FOOD[o.side]).toLowerCase()):''].filter(Boolean).join('; ');
-    o.why=o.fails.length?'Over: '+o.fails[0]:(o.goods.slice(0,2).join(' · ')||'Within your limits');
+    o.why=o.fails.length?'↑ '+o.fails[0]:(o.goods.slice(0,2).join(' · ')||'Within your limits');
     const k=o.src+':'+c.ids.join('+');if(!by.has(k)||by.get(k).sc<o.sc)by.set(k,o)}
   return {B,list:[...by.values()].sort((a,b)=>b.sc-a.sc)}}
 const condFocus=()=>[hasC('High blood pressure')&&'low sodium',hasC('Gout')&&'low purine',hasC('Prediabetes')&&'more fiber, less sugar',hasC('High cholesterol')&&'less saturated fat'].filter(Boolean);
-const LIMIT_SRC='Limits: sodium AHA · purine Japanese gout guideline · sugar WHO/ADA · plate ADA/Harvard. Not a prescription; your doctor’s limits come first.';
 function buildMenu(){const gp=enoughHist()?gaps(analyse(7)):[],out={},used=new Set(),modes=loadModes();
   for(const m of ['Breakfast','Lunch','Dinner']){out[m]={quan:rankMeal(m,'quan',false,used).list.slice(0,3),nau:rankMeal(m,'nau',false,used).list.slice(0,3)};
     const top=out[m][modes[m]][0];if(top)top.ids.forEach(id=>{if(BASE_CAT.has(FOOD[id].category))used.add(id)})}
@@ -1102,7 +1101,7 @@ function menuCard(){
         <div class="mact"><button class="linkbtn" data-swap="${meal}">Swap dish</button>${done?'':`<button class="btn-s" data-eat="${meal}">Eat this</button>`}</div></div>`:''}
     </div>`}).join('');
   const gp=(m.gp.length?m.gp.slice(0,3).map(x=>x.n.toLowerCase()):condFocus()).join(', ');
-  return `<div class="card"><h5>Meal ideas for today<small>Tap a meal for details</small></h5>${gp?`<div class="foods">Focus on: <b>${gp}</b></div>`:''}<div class="mlist">${rows}</div><div class="why-src" style="margin:6px 0 0">${LIMIT_SRC}</div></div>`;
+  return `<div class="card"><h5>Meal ideas for today<small>Tap a meal for details</small></h5>${gp?`<div class="foods">Focus on: <b>${gp}</b></div>`:''}<div class="mlist">${rows}</div></div>`;
 }
 function reportCard(){
   const a=analyse(7),gp=gaps(a).slice(0,3),su=a.src.sugar_g.list[0],ts=a.tag.tra_sua,prev=analyse(7,7).tag.tra_sua;
@@ -1143,7 +1142,7 @@ function suggCard(e){
   const none=e.shown.length&&e.shown[0].fails.length?'<div class="says amber"><b>Nothing fits every limit right now</b> · these are the closest</div>':'';
   return `<div class="card"><h5>${e.meal==='Late night'?'Late-night':e.meal} ideas${e.mode?` · ${e.mode==='nau'?'cook':'eat out'}`:''}<small>Tap ✓ to log it</small></h5>
     <div class="foods">${head}</div>${none}<div class="mlist">${rows||'<div class="says">No ideas yet.</div>'}</div>
-    ${n>3?`<button class="linkbtn" data-smore="${e.id}">Other ideas</button>`:''}<div class="why-src" style="margin:6px 0 0">${LIMIT_SRC}</div></div>`}
+    ${n>3?`<button class="linkbtn" data-smore="${e.id}">Other ideas</button>`:''}</div>`}
 function handleSuggestText(n,raw){
   if(ALIAS.has(n))return false;
   if(!/\b(goi y|de xuat|suggest|suggestion|recommend|ideas?)\b|\ban gi\b|\bnen an\b|what (should|can|to) (i )?(eat|have|cook)|\b(hungry|doi bung|doi qua)\b/.test(n))return false;
