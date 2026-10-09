@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009131243";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009132139";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -112,7 +112,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
   border:1px solid var(--line);border-radius:999px;padding:5px 12px}
 .sys svg{color:var(--blue)}
 .me{align-self:flex-end;max-width:84%}
-.me .bubble[data-hold]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .15s}
+.me .bubble[data-hold]{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .15s;touch-action:pan-y}
 .me.held .bubble{transform:scale(.97);filter:brightness(.92)}
 .msgact{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
 .msgact button{height:36px;padding:0 14px;border-radius:12px;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.08)}
@@ -506,6 +506,10 @@ button.sb{cursor:pointer}
 .qchip.rc{max-width:210px}.qchip.rc svg{color:var(--green);flex:none}.qchip.rc span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .editbar{display:flex;align-items:center;gap:8px;margin:8px 12px 0;padding:7px 8px 7px 12px;border-radius:12px;background:var(--blue-soft);color:var(--blue);font-size:12.5px;font-weight:600}
 .editbar[hidden]{display:none}
+/* Vuốt một bữa để nhắm lệnh gõ tiếp theo vào đúng bữa đó (như vuốt để trả lời trên Instagram) */
+#scrToday{overflow-x:hidden}
+.me .bubble[data-hold].sw{transition:none}
+.me.aimed .bubble{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--blue)}
 .editbar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .editbar button{padding:2px 6px;font-size:15px}
 .field input[type=time]{height:44px;border-radius:12px;border:1px solid var(--line);background:var(--raised);padding:0 12px;font:inherit;color:var(--ink);width:100%}
@@ -837,7 +841,7 @@ function mergeItems(items){
 
 /* ---------- maths ---------- */
 const withParts=it=>it.fid&&!it.guess&&!it.parts&&comboParts(it.fid)?{...it,parts:comboParts(it.fid)}:it;
-const flat=items=>items.flatMap(it=>it.parts?it.parts.filter(p=>p.on).map(p=>({fid:p.fid,qty:p.qty*it.qty,size:it.size})):[it]);
+const flat=items=>items.flatMap(it=>it.parts&&!it.snap?it.parts.filter(p=>p.on).map(p=>({fid:p.fid,qty:p.qty*it.qty,size:it.size,sugar:it.sugar})):[it]);
 function itemVals(it){const o={};NUTR.forEach(k=>o[k]=0);if(it.snap){NUTR.forEach(k=>o[k]=+it.snap[k]||0);return o}if(!it.fid)return o;if(it.parts){for(const p of it.parts){if(!p.on)continue;const v=itemVals({fid:p.fid,qty:p.qty*it.qty,size:it.size,sugar:it.sugar});NUTR.forEach(n=>o[n]+=v[n])}return o}const f=FOOD[it.fid],k=it.qty*SIZES[it.size].k;
   NUTR.forEach(n=>o[n]=(+f[n]||0)*k);if(isAlcohol(f))o.volume_ml=0;
   if(it.sugar!=null&&it.sugar<100&&sugarAdj(f)){const cut=(+f.sugar_g||0)*k*(1-it.sugar/100)*.9;o.sugar_g-=cut;o.carb_g-=cut;o.kcal-=cut*4}return o}
@@ -985,18 +989,20 @@ function analyse(n=state.period,offset=0){return analyseDays(HIST.slice(HIST.len
 function analyseDays(days){
   const n=Math.max(1,days.length),tots=days.map(dayTotals);
   const avg={};NUTR.concat(['water']).forEach(k=>avg[k]=tots.reduce((s,t)=>s+t[k],0)/n);
+  // Nhóm thực phẩm/nhãn/nguồn tính theo thành phần (bún + trứng cút + đậu hũ → có đạm nạc), không chỉ theo món chính
+  const has=(it,k)=>flat([it]).some(p=>FOOD[p.fid]&&FOOD[p.fid].groups.includes(k));
   const g={};
   for(const G of GROUPS){
     let c=0;
     if(G.per==='day')c=tots.filter(G.test).length;
-    else if(G.per==='serv')c=days.reduce((s,d)=>s+d.items.filter(it=>FOOD[it.fid].groups.includes(G.k)).length,0);
-    else c=days.filter(d=>d.items.some(it=>FOOD[it.fid].groups.includes(G.k))).length;
+    else if(G.per==='serv')c=days.reduce((s,d)=>s+d.items.filter(it=>has(it,G.k)).length,0);
+    else c=days.filter(d=>d.items.some(it=>has(it,G.k))).length;
     const goal=G.per==='serv'?G.goal*n/7:G.goal*n/7;
     g[G.k]={c,goal:Math.round(goal*10)/10,r:c/goal};
   }
-  const tag={};for(const [k] of TAGS)tag[k]=days.reduce((s,d)=>s+d.items.filter(it=>FOOD[it.fid].tags.includes(k)).reduce((a,it)=>a+it.qty,0),0);
+  const tag={};for(const [k] of TAGS)tag[k]=days.reduce((s,d)=>s+flat(d.items).filter(it=>FOOD[it.fid]&&FOOD[it.fid].tags.includes(k)).reduce((a,it)=>a+it.qty,0),0);
   const src={};for(const k of ['sugar_g','sodium_mg','purine_mg','kcal','caffeine_mg']){const m={};
-    for(const d of days)for(const it of d.items){const f=FOOD[it.fid],v=itemVals(it)[k];if(v>0)m[f.name]=(m[f.name]||0)+v}
+    for(const d of days)for(const it of flat(d.items)){const f=FOOD[it.fid],v=itemVals(it)[k];if(f&&v>0)m[f.name]=(m[f.name]||0)+v}
     const tot=Object.values(m).reduce((a,b)=>a+b,0);src[k]={tot,list:Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([nm,v])=>({nm,v,p:tot?v/tot:0}))}}
   const scores=tots.map((t,i)=>score(t,false,days[i].items));
   return {days,tots,avg,g,tag,src,scores,n};
@@ -1089,7 +1095,7 @@ function rankMeal(meal,mode,useToday,exclude=new Set()){
     if(B.veg&&o.v.veg_g<B.veg*.8){let best=null;
       for(const sd of sidesFor(c,meal)){if(c.ids.includes(sd))continue;const its=[...c.items,{fid:sd,qty:1,size:'M'}],e=evalOpt(its,B);if(!best||e.pen<best.e.pen)best={sd,its,e}}
       if(best&&best.e.pen<o.pen)o={...o,...best.e,items:best.its,side:best.sd}}
-    let sc=-o.pen;const grp=new Set(o.items.flatMap(it=>FOOD[it.fid].groups));for(const x of gp.slice(0,3))if(grp.has(x.key))sc+=4;
+    let sc=-o.pen;const grp=new Set(flat(o.items).flatMap(it=>FOOD[it.fid]?FOOD[it.fid].groups:[]));for(const x of gp.slice(0,3))if(grp.has(x.key))sc+=4;
     if(o.fav)sc+=3;if(c.ids.some(id=>recent.has(id)&&BASE_CAT.has(FOOD[id].category)))sc-=6;
     o.sc=sc;o.kcal=o.v.kcal;o.name=(c.name||c.ids.map(id=>shortName(FOOD[id])).join(' + '))+(o.side?' + '+shortName(FOOD[o.side]):'');
     o.tip=[c.tip,o.side?(SOUP_SIDES.includes(o.side)?'ask for extra '+shortName(FOOD[o.side]).toLowerCase():'add a side of '+shortName(FOOD[o.side]).toLowerCase()):''].filter(Boolean).join('; ');
@@ -1340,7 +1346,7 @@ function renderTimeline(){
     if(e.kind==='card'){const pk=pinKey(e),body=(e.type==='menu'?menuCard():e.type==='report'?reportCard():e.type==='sugg'?suggCard(e):e.type==='search'?searchCard(e):e.type==='drink'?drinkCard(e):answerCard(e.type)).replace('<div class="card"',`<div class="card" data-hold="k:${pk}"`);
       return st+`<div class="bot ${pop}${bot()}" data-eid="${pk}">${AV()}<div class="bot-col">${body}${state.hold==='k:'+pk?cardMenu(pk):''}</div></div>`}
     const v=sumItems(e.items),[lv,head,tail]=comment(e,t,gp);me();
-    return st+`<div class="me ${pop}${zt}${state.hold===e.id?' held':''}" data-eid="m:${e.id}"><div class="bubble" data-hold="${e.id}">${esc(e.text)}${rxHTML(e)}</div>${state.hold===e.id?holdMenu(e,false):''}</div>
+    return st+`<div class="me ${pop}${zt}${state.hold===e.id?' held':''}${state.target===e.id?' aimed':''}" data-eid="m:${e.id}"><div class="bubble" data-hold="${e.id}">${esc(e.text)}${rxHTML(e)}</div>${state.hold===e.id?holdMenu(e,false):''}</div>
     <div class="bot ${pop}${bot()}">${AV()}<div class="bot-col"><div class="card"><div class="chips">${e.items.map((it,i)=>chipHTML('e:'+e.id+':'+i,it)).join('')}</div>${ibarFor('e:'+e.id+':',e.items)}${partsHTML(e.items)}${plateHTML(e.items)}
       <div class="says ${lv}"><b>${head}</b> · ${tail}</div></div>
       <div class="meta num"><button class="mealbtn" data-mealof="${e.id}">${e.date?'<span class="lf">Yesterday</span><span class="ls">Yest.</span> · ':''}${e.meal} ▾</button> · ${fmt(v.kcal)} kcal${v.caffeine_mg>0?`<span class="mx-caf"> · <span class="lf">caffeine</span><span class="ls">caf.</span> ${fmt(v.caffeine_mg)} mg</span>`:''}${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}${tasteIcons(e)}</div>${state.mealPick===e.id?`<div class="mealrow">${MEALS.map(m=>`<button data-setmeal="${e.id}|${m}" aria-pressed="${e.meal===m}">${m}</button>`).join('')}<button class="del" data-delmeal="${e.id}">${svg('trash',13)}Delete</button></div>`:''}</div></div>`;
@@ -1421,6 +1427,7 @@ $('#composer').addEventListener('submit',ev=>{ev.preventDefault();const v=$('#sa
   if(!v){if(state.draft)saveDraft();return}
   $('#say').value='';hideSuggest();
   if(state.editing){applyEdit(v);return}
+  if(state.target){if(handleEditText(enCmd(norm(v)),v)||addToTarget(v))return}
   if(handleWeightText(norm(v)))return;
   if(handleWaterText(enWater(norm(v))))return;
   if(handleSuggestText(norm(v),v))return;
@@ -1458,13 +1465,24 @@ function addToHist(e){const t=yday().getTime();let d=HIST.find(h=>h.date.getTime
     tm=setTimeout(()=>{tm=null;state.hold=b.dataset.hold;state.holdAt=Date.now();if(navigator.vibrate)navigator.vibrate(15);renderTimeline();const hm=document.querySelector('.holdmenu');if(hm)hm.scrollIntoView({block:'nearest',behavior:'smooth'})},450)});
   tl.addEventListener('pointermove',ev=>{if(tm&&Math.hypot(ev.clientX-x0,ev.clientY-y0)>10)stop()});
   ['pointerup','pointercancel'].forEach(t=>tl.addEventListener(t,stop));
+  // Vuốt ngang bong bóng bữa ăn (hôm nay/hôm qua) ≥ 56px → nhắm bữa đó cho lệnh gõ tiếp theo
+  let sw=null,swAt=0;
+  tl.addEventListener('pointerdown',ev=>{const b=ev.target.closest('.me .bubble[data-hold]');
+    sw=b&&state.entries.some(x=>x.id===b.dataset.hold&&x.kind==='meal')?{b,x:ev.clientX,y:ev.clientY,dx:0,on:false}:null});
+  tl.addEventListener('pointermove',ev=>{if(!sw)return;const dx=ev.clientX-sw.x,dy=ev.clientY-sw.y;
+    if(!sw.on){if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){sw=null;return}if(Math.abs(dx)<10)return;sw.on=true;sw.b.classList.add('sw');try{sw.b.setPointerCapture(ev.pointerId)}catch(e){}}
+    sw.dx=Math.max(-72,Math.min(72,dx));sw.b.style.transform=`translateX(${sw.dx}px)`;if(Math.abs(sw.dx)>=56&&!sw.buzz){sw.buzz=1;if(navigator.vibrate)navigator.vibrate(8)}});
+  const swEnd=ev=>{if(!sw)return;const s0=sw;sw=null;if(!s0.on)return;s0.b.classList.remove('sw');s0.b.style.transform='';swAt=Date.now();
+    if(ev.type==='pointerup'&&Math.abs(s0.dx)>=56)aimMeal(s0.b.dataset.hold)};
+  ['pointerup','pointercancel'].forEach(t=>tl.addEventListener(t,swEnd));
+  tl.addEventListener('click',ev=>{if(Date.now()-swAt<350){ev.stopPropagation();ev.preventDefault()}},true);
   tl.addEventListener('contextmenu',ev=>{if(ev.target.closest('[data-hold]'))ev.preventDefault()});
   document.addEventListener('click',ev=>{if(state.hold&&Date.now()-state.holdAt>300&&!ev.target.closest('.holdmenu')){state.hold=null;renderTimeline()}},true)})();
 function deleteMeal(id){state.hold=null;const i=state.entries.findIndex(x=>x.id===id);if(i<0)return;const e=state.entries[i];
   let hd=null,hit=[];if(e.date){const t=yday().getTime();hd=HIST.find(h=>h.date.getTime()===t);
     if(hd){hit=hd.items.filter(it=>it.mid===e.id);hd.items=hd.items.filter(it=>it.mid!==e.id)}}
   state.entries.splice(i,1);state.mealPick=null;state.pick=null;
-  if(state.editing===id){state.editing=null;$('#say').value=''}
+  if(state.editing===id){state.editing=null;$('#say').value=''}if(state.target===id)state.target=null;
   state.undo=()=>{insertByTime(e);if(hd)hd.items.push(...hit)};renderAll(false);showToast('Deleted · '+e.text)}
 /* Chèn lại theo giờ (không theo vị trí cũ: hoàn tác nhiều bước làm vị trí cũ lệch). Nước/cân luôn ở cuối nên bỏ qua. */
 function insertByTime(e){const m=toMin(e.t),ni=state.entries.findIndex(x=>x!==e&&x.kind!=='water'&&x.kind!=='weight'&&toMin(x.t)!=null&&toMin(x.t)>m);
@@ -1509,7 +1527,7 @@ $('#suggest').addEventListener('click',ev=>{const b=ev.target.closest('[data-f]'
   const raw=$('#say').value,cut=Math.max(raw.lastIndexOf(','),raw.lastIndexOf(';')),head=raw.slice(0,cut+1),last=raw.slice(cut+1);
   const lead=(last.match(/^\s*((?:ăn|uống|an|uong)\s+)?((?:sáng|trưa|tối|xế|khuya|sang|trua|toi|xe)\s+)?/i)||[''])[0];
   $('#say').value=(head+' '+lead+shortName(FOOD[b.dataset.f])).replace(/\s+/g,' ').trimStart()+', ';hideSuggest();$('#say').focus()});
-$('#qchips').addEventListener('click',ev=>{const rt=ev.target.closest('[data-rt]');if(rt){if(state.editing){state.editing=null;renderEditbar()}$('#say').value=rt.dataset.rt;$('#composer').requestSubmit();return}
+$('#qchips').addEventListener('click',ev=>{const rt=ev.target.closest('[data-rt]');if(rt){if(state.editing||state.target){state.editing=null;state.target=null;renderEditbar()}$('#say').value=rt.dataset.rt;$('#composer').requestSubmit();return}
   const b=ev.target.closest('.qchip');if(!b)return;const q=b.dataset.q;
   if(q==='now'){handleSuggestText('an gi',b.textContent);return}
   if(q==='drink'){askDrink(b.textContent);return}
@@ -1645,7 +1663,7 @@ function enWater(n){
     .replace(/\b(?:glass(?:es)?|cups?)(?: of)?\b/g,'ly').replace(/(\d+(?:[.,]\d+)?|nua)\s+(.*?)\s*bottles?\b(?: of)?/,'$1 binh $2').replace(/\bbottles?\b(?: of)?/g,'binh')
     .replace(/\b(?:liters?|litres?)\b/g,'lit').replace(/\bwater\b/g,'nuoc').replace(/\s+/g,' ').trim()}
 function handleEditText(n,raw){
-  const e=[...state.entries].reverse().find(x=>x.kind==='meal');if(!e||!e.items.length||ALIAS.has(n))return false;
+  const e=(state.target&&state.entries.find(x=>x.id===state.target&&x.kind==='meal'))||[...state.entries].reverse().find(x=>x.kind==='meal');if(!e||!e.items.length||ALIAS.has(n))return false;
   const ok=x=>x&&x.fid&&!x.guess,its=e.items.filter(ok);if(!its.length)return false;
   // Lệnh đường → món chỉnh được đường; "bỏ/thêm/ít X" → món có thành phần X; còn lại → món cuối.
   const w=(n.match(/^(?:bo|khong|ko|tru|it|nhieu|them|gap doi) (.+)$/)||[])[1];
@@ -1670,7 +1688,16 @@ function handleEditText(n,raw){
       if(!it.parts)it.parts=[{fid:it.fid,qty:1,on:true}];it.parts.push({fid:g.f.id,qty:1,on:true})}
     else return false}
   else return false;
-  delete it.habit;state.undo=()=>{e.items=JSON.parse(snap)};renderAll(false);showToast('Updated · '+raw);return true}
+  delete it.habit;if(e.date)addToHist(e);state.undo=()=>{e.items=JSON.parse(snap);if(e.date)addToHist(e)};
+  const aimed=state.target===e.id;state.target=null;renderAll(false);showToast((aimed?`Updated ${e.meal} ${e.t} · `:'Updated · ')+raw);return true}
+/* Đã vuốt chọn bữa mà câu gõ không phải lệnh sửa (vd "1 quả trứng") → thêm món vào đúng bữa đó thay vì tạo bữa mới. */
+function addToTarget(v){const e=state.entries.find(x=>x.id===state.target&&x.kind==='meal');if(!e)return false;
+  const n=enCmd(norm(v));if(/^(bo|khong|ko|tru|it|bot|nhieu|gap doi|size|co|duong)\b/.test(n)){showToast(`Couldn't apply “${v}” to ${e.meal}`,false);return true}
+  v=v.replace(/^\s*(thêm|them|add|plus)\s+/i,'');
+  const p=parse(v,Math.floor((toMin(e.t)??720)/60));if(!p.items.length){showToast('No food recognized',false);return true}
+  const snap=JSON.stringify(e.items),add=p.items.map(autoGuess).map(applyHabits);e.items.push(...add);e.text=e.text+', '+v;state.target=null;
+  if(e.date)addToHist(e);state.undo=()=>{e.items=JSON.parse(snap);e.text=e.text.slice(0,-(v.length+2));if(e.date)addToHist(e)};
+  lookupUnknown(e);renderAll(false);showToast(`Added to ${e.meal} ${e.t} · `+add.map(it=>it.fid?shortName(FOOD[it.fid]):it.name).join(', '));return true}
 /* Thói quen: 2 lần gần nhất cùng một lựa chọn khác mặc định → lần sau tự áp dụng. Đổi lại 2 lần là bỏ. */
 let HABITS={};try{HABITS=JSON.parse(localStorage.getItem('bh_habits')||'{}')||{}}catch(e){}
 if(LIVE&&BOOT&&BOOT.habits)HABITS=BOOT.habits;
@@ -1764,10 +1791,15 @@ function setReact(k,r){const f=findMeal(k);if(!f)return;const e=f.m;e.react=e.re
   if(f.past&&LIVE)enqueue('react:'+e.id,'setReaction',{id:e.id,reaction:e.react})
   renderTimeline();showToast(e.react?`Noted · ${RX[r][1].toLowerCase()} after ${e.meal.toLowerCase()}`:'Feeling removed',false)}
 function renderEditbar(){const el=$('#editbar'),e=state.editing&&state.entries.find(x=>x.id===state.editing);
+  const tg=!e&&state.target&&state.entries.find(x=>x.id===state.target&&x.kind==='meal');if(!tg)state.target=null;
+  $('#say').placeholder=tg?'e.g. no sugar, add egg':'What did you eat or drink?';
+  if(tg){el.hidden=false;el.innerHTML=`${svg('pencil',14)}<span>Next message changes · ${esc(tg.meal)} ${esc(tg.t)}</span><button type="button" data-x="1" aria-label="Cancel">✕</button>`;return}
   if(!e){state.editing=null;el.hidden=true;return}
   el.hidden=false;el.innerHTML=`${svg('pencil',14)}<span>Editing · ${esc(e.meal)} ${esc(e.t)}</span><button type="button" data-x="1" aria-label="Cancel edit">✕</button>`}
-$('#editbar').addEventListener('click',ev=>{if(ev.target.closest('[data-x]')){state.editing=null;$('#say').value='';renderEditbar()}});
-function startEdit(id){const e=state.entries.find(x=>x.id===id);if(!e)return;state.hold=null;state.editing=id;
+$('#editbar').addEventListener('click',ev=>{if(ev.target.closest('[data-x]')){const t=state.target;state.editing=null;state.target=null;$('#say').value='';renderEditbar();if(t)renderTimeline()}});
+function aimMeal(id){const e=state.entries.find(x=>x.id===id&&x.kind==='meal');if(!e)return;state.hold=null;state.editing=null;
+  state.target=state.target===id?null:id;if(navigator.vibrate)navigator.vibrate(10);renderEditbar();renderTimeline();if(state.target)$('#say').focus()}
+function startEdit(id){const e=state.entries.find(x=>x.id===id);if(!e)return;state.hold=null;state.editing=id;state.target=null;
   $('#say').value=e.text;renderEditbar();renderTimeline();$('#say').focus()}
 function applyEdit(v){const e=state.entries.find(x=>x.id===state.editing);state.editing=null;renderEditbar();if(!e||v===e.text)return;
   const p=parse(v,Math.floor((toMin(e.t)??720)/60));if(!p.items.length){showToast('No food recognized',false);return}
