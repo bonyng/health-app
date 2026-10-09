@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009111659";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009112616";
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
 </script>
 <title>Bony Health</title>
@@ -1770,7 +1770,9 @@ async function flush(){if(flushing||!OUTBOX.length)return;flushing=true;
 addEventListener('online',()=>flush());
 // Quay lại app (PWA chạy nền không tự tải lại) → đẩy thay đổi rồi lấy dữ liệu mới, để thấy món nhập trên máy khác
 document.addEventListener('visibilitychange',()=>{if(document.hidden||!LIVE)return;
-  flush().then(()=>{if(OUTBOX.length)return;if(newData)location.reload();else if(Date.now()-bootAt>60000){touched=false;refreshBoot()}})});
+  // Mở lại sau 4 giờ sáng của ngày mới → tải lại, nếu không món mới vẫn bị ghi vào ngày cũ
+  const dayNow=isoD(new Date(Date.now()-4*3600e3));
+  flush().then(()=>{if(OUTBOX.length)return;if(newData||dayNow!==TODAY)location.reload();else if(Date.now()-bootAt>60000){touched=false;refreshBoot()}})});
 function mealPayload(e){return {id:e.id,date:e.date||TODAY,time:e.t,meal:e.meal,raw_text:e.text,
   items:e.items.map(it=>({fid:it.fid||null,name:it.name||'',qty:it.qty,size:it.size||'M',sugar:it.sugar??null,parts:it.parts||null,guess:!!it.guess,habit:it.habit||'',snap:itemVals(it)}))}}
 const hashOf=o=>JSON.stringify(o);
