@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009112821";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009113131";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -102,6 +102,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 
 /* ---------- screens ---------- */
 .screen{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+*{scrollbar-width:none}*::-webkit-scrollbar{display:none}
 .timeline{display:flex;flex-direction:column;gap:12px;padding:16px 14px 14px}
 .daysep{align-self:center;font-size:11px;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;font-weight:600}
 .sys{align-self:center;display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);background:var(--surface);
