@@ -12,8 +12,11 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009112616";
-if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('sw.js'));
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009112802";
+// Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
+if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
+  navigator.serviceWorker.register('sw.js').then(r=>document.addEventListener('visibilitychange',()=>{if(!document.hidden)r.update().catch(()=>{})}))});
 </script>
 <title>Bony Health</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
