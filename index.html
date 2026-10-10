@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261009172242";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261010135655";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -586,15 +586,27 @@ const RAW={"cols":["id","name","aliases","category","portion_label","portion_g",
 /* LIVE = bản PWA thật (build_pwa.py chèn BH_API). Bản bấm thử (artifact) không có → dùng dữ liệu ví dụ. */
 const LIVE=typeof BH_API!=='undefined';
 let BOOT=null;if(LIVE){try{BOOT=JSON.parse(localStorage.getItem('bh_boot')||'null')}catch(e){}}
+/* Dữ liệu từ Sheet có thể bị sửa tay → kiểm 1 lần lúc nạp (id, ngày, giờ, bữa, màu bình) thay vì escape từng chỗ hiển thị;
+   id và màu nằm trong thuộc tính HTML/SVG nên escape không đủ. Dòng sai bị bỏ. */
+if(BOOT){const ID=/^[\w-]{1,64}$/,DT=/^\d{4}-\d{2}-\d{2}$/,TM=/^\d{1,2}:\d{2}/,ML=['Breakfast','Lunch','Snack','Dinner','Late night','Drinks'],A=x=>Array.isArray(x)?x:[];
+  BOOT.meals=A(BOOT.meals).filter(m=>Array.isArray(m)&&ID.test(m[0])&&DT.test(m[1])).map(m=>{const r=m.slice();r[2]=TM.test(String(r[2]))?String(r[2]).slice(0,5):'12:00';if(!ML.includes(r[3]))r[3]='Snack';return r});
+  BOOT.items=A(BOOT.items).filter(r=>Array.isArray(r)&&ID.test(r[0])).map(r=>{const x=r.slice();if(x[1]!=null&&x[1]!==''&&!ID.test(String(x[1])))x[1]='';
+    try{const pa=typeof x[6]==='string'&&x[6]?JSON.parse(x[6]):x[6];x[6]=Array.isArray(pa)?JSON.stringify(pa.filter(q=>q&&ID.test(String(q.fid))).map(q=>({...q,fid:String(q.fid),qty:+q.qty||1,on:q.on===true||q.on==='true'}))):''}catch(e){x[6]=''}return x});
+  BOOT.water=A(BOOT.water).filter(r=>Array.isArray(r)&&DT.test(r[0])&&ID.test(String(r[1])));
+  BOOT.weights=A(BOOT.weights).filter(r=>Array.isArray(r)&&DT.test(String(r[0]))&&+r[1]>0);
+  BOOT.bottles=A(BOOT.bottles).filter(b=>b&&ID.test(String(b.id))).map(b=>({...b,id:String(b.id),name:String(b.name||'Bottle').slice(0,40),ml:+b.ml>0&&+b.ml<=5000?+b.ml:500,color:/^#[0-9a-f]{3,8}$/i.test(b.color)?b.color:'#2477E8'}))}
 // Món Gemini thêm / alias mới trên Sheet: ghép vào từ điển trước khi dựng FOODS
-if(BOOT&&BOOT.foods)for(const o of BOOT.foods){if(!o||!o.id||o.active===false||o.active==='FALSE')continue;
+// Món Gemini ước lượng mà chưa xác nhận → chip luôn ghi "AI est." để nhớ số liệu chỉ là ước lượng
+const AIEST=new Set();
+if(BOOT&&BOOT.foods)for(const o of BOOT.foods){if(!o||!/^[\w-]{1,64}$/.test(String(o.id))||o.active===false||o.active==='FALSE')continue;
+  if(o.source==='gemini'&&!(o.verified===true||o.verified==='TRUE'||o.verified==='true'))AIEST.add(o.id);
   const row=RAW.cols.map((c,i)=>{const v=Array.isArray(o[c])?o[c].join('|'):o[c];if(v===undefined||v===null)return '';return typeof RAW.rows[0][i]==='number'&&v!==''?+v:v});
   const j=RAW.rows.findIndex(r=>r[0]===o.id);if(j>=0)RAW.rows[j]=row;else RAW.rows.push(row)}
 const $=s=>document.querySelector(s);
 const fmt=n=>Math.round(n||0).toLocaleString('en-US');
 const fmt1=n=>(Math.round(n*10)/10).toLocaleString('en-US');
 const norm=s=>s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/g,'d').replace(/\s+/g,' ').trim();
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const pad2=n=>String(n).padStart(2,'0');
 
 /* ---------- dictionary ---------- */
@@ -606,14 +618,25 @@ const ids=list=>list.filter(has);
 const SIZES={S:{l:'Small',k:.7},M:{l:'Regular',k:1},L:{l:'Large',k:1.4}};
 const NEXT={S:'M',M:'L',L:'S'};
 const NUTR=['kcal','protein_g','satfat_g','sugar_g','fiber_g','sodium_mg','purine_mg','cholesterol_mg','caffeine_mg','volume_ml','calcium_mg','iron_mg','potassium_mg','vitc_mg','vitd_ug','omega3_g','veg_g','fruit_g'];
+// fsugar_g = đường tự do (WHO): không tính đường trái cây và đồ "không đường". Mọi ngưỡng đường dùng số này.
+const NUTRX=NUTR.concat(['fsugar_g']);
+const freeSugItem=it=>{const f=it.fid&&FOOD[it.fid];return !(f&&(f.groups.includes('trai_cay')||/khong_duong/.test(it.fid)))};
 const isAlcohol=f=>f.tags.includes('ruou_bia')||f.category==='bia_ruou';
 
 /* ---------- profile & targets (theo docs/research/CHUAN_DINH_DUONG.md) ---------- */
-const PROFILE={born:1990,sex:'Male',h:170,w:71,act:1.375,cond:['Gout','Prediabetes','High cholesterol','High blood pressure'],mine:false};
+// Hồ sơ mẫu trung tính: code nằm trên repo public, không để số đo/bệnh nền thật ở đây.
+const PROFILE_SAMPLE={born:1990,sex:'Male',h:170,w:70,act:1.375,cond:[]};
+const PROFILE={...PROFILE_SAMPLE,cond:[],mine:false};
 const ACTS=[[1.2,'Sedentary','Mostly sitting, little or no exercise'],[1.375,'Light','Walking, 1–3 workouts a week'],[1.55,'Moderate','3–5 workouts a week'],[1.725,'Active','Hard training 6–7 days a week']];
 const CONDS=['Gout','Prediabetes','High cholesterol','High blood pressure','Stomach'];
 try{const sv=JSON.parse(localStorage.getItem('bh_profile')||'null');if(sv){Object.assign(PROFILE,sv,{mine:true});const CM={'Ti\u1ec1n ti\u1ec3u \u0111\u01b0\u1eddng':'Prediabetes','M\u1ee1 m\u00e1u':'High cholesterol','Huy\u1ebft \u00e1p':'High blood pressure','D\u1ea1 d\u00e0y':'Stomach'};PROFILE.cond=(PROFILE.cond||[]).map(c=>CM[c]||c);if(PROFILE.sex==='Nam')PROFILE.sex='Male';if(PROFILE.sex==='N\u1eef')PROFILE.sex='Female'}}catch(e){}
-if(BOOT&&BOOT.profile)Object.assign(PROFILE,BOOT.profile,{mine:true});
+// Sheet chỉ có cân nặng (chưa lưu hồ sơ) trả về born/sex/act rỗng → bỏ ô rỗng, không đè số mẫu; chỉ coi là "của bạn" khi đã có giới tính.
+if(BOOT&&BOOT.profile){const bp={};for(const [k,v] of Object.entries(BOOT.profile))if(v!=null&&v!=='')bp[k]=v;Object.assign(PROFILE,bp);if(bp.sex)PROFILE.mine=true}
+/* Chuẩn hoá hồ sơ (Sheet/máy có thể bị sửa tay): sai kiểu → về số mẫu, bệnh nền chỉ giữ tên trong danh sách. */
+(function normProfile(){const S=PROFILE_SAMPLE,n=(v,a,b,d)=>{v=+v;return v>=a&&v<=b?v:d};
+  PROFILE.born=n(PROFILE.born,1900,new Date().getFullYear(),S.born);PROFILE.h=n(PROFILE.h,100,250,S.h);PROFILE.w=n(PROFILE.w,25,300,S.w);
+  if(!['Male','Female'].includes(PROFILE.sex))PROFILE.sex=S.sex;PROFILE.act=+PROFILE.act;if(!ACTS.some(a=>a[0]===PROFILE.act))PROFILE.act=S.act;
+  PROFILE.cond=Array.isArray(PROFILE.cond)?PROFILE.cond.filter(c=>CONDS.includes(c)):[]})();
 const hasC=c=>PROFILE.cond.includes(c);
 const actLabel=()=>(ACTS.find(a=>a[0]===PROFILE.act)||ACTS[1])[1];
 let AGE,BMR,TDEE,BMI,DEF;const T={};
@@ -636,7 +659,7 @@ recalc();
 const WHY={
   kcal:{n:'Calories',u:'kcal',lim:false,v:t=>t.kcal,g:()=>T.kcal,how:()=>`BMR ${fmt(BMR)} kcal (Mifflin-St Jeor: age ${AGE}, ${PROFILE.sex.toLowerCase()}, ${PROFILE.h} cm, ${fmt1(PROFILE.w)} kg) × ${PROFILE.act} (${actLabel().toLowerCase()}) = ${fmt(TDEE)} kcal. `+(DEF?`BMI ${fmt1(BMI)} → minus ${DEF} kcal to lose 0.25–0.5 kg a week, never below BMR or ${PROFILE.sex==='Male'?'1,500':'1,200'} kcal.`:`BMI ${fmt1(BMI)} is normal → maintain weight.`)+' This is an estimate (±10–15%); the app adjusts after 2–4 weeks of real weigh-ins.',src:'Mifflin-St Jeor 1990; AHA/ACC/TOS 2013; Vietnam MOH Decision 2892/2022 (Asian BMI)'},
   na:{n:'Sodium',u:'mg',lim:true,v:t=>t.sodium_mg,g:()=>T.na,how:()=>'Under 2,000 mg sodium ≈ 5 g salt.'+(hasC('High blood pressure')?' With high blood pressure: under 1,500 mg is best (green), over 2,000 mg is red.':''),src:'WHO 2012; Vietnam RDA 2016; AHA/ACC 2025'},
-  su:{n:'Sugar',u:'g',lim:true,v:t=>t.sugar_g,g:()=>T.su,how:()=>`Free sugar from your calories: ${hasC('Prediabetes')?'5%':'10%'} × ${fmt(T.kcal)} kcal ÷ 4 = ${T.su} g. Ideal is 5%.`+(hasC('Prediabetes')?' With prediabetes, 5% is the cap; swap sweet drinks for water.':''),src:'WHO 2015; ADA Standards of Care 2026 (5.21, 5.25)'},
+  su:{n:'Sugar',u:'g',lim:true,v:t=>t.fsugar_g,g:()=>T.su,how:()=>`Free sugar from your calories: ${hasC('Prediabetes')?'5%':'10%'} × ${fmt(T.kcal)} kcal ÷ 4 = ${T.su} g. Ideal is 5%.`+(hasC('Prediabetes')?' With prediabetes, 5% is the cap; swap sweet drinks for water.':''),src:'WHO 2015; ADA Standards of Care 2026 (5.21, 5.25)'},
   pu:{n:'Purine',u:'mg',lim:true,v:t=>t.purine_mg,g:()=>T.pu,how:()=>(hasC('Gout')?'Reference 400 mg/day (Japanese guideline). ACR/EULAR set no number, so the app warns per food: organ meats, shellfish, sweet drinks, alcohol.':'No gout in your profile; purine is for reference only.'),src:'Japanese Guideline for Hyperuricemia & Gout; Kaneko 2014; ACR 2020'},
   cf:{n:'Caffeine',u:'mg',lim:true,v:t=>t.caffeine_mg,g:()=>T.cf,how:()=>'Max 400 mg a day, no more than 200 mg at once. 1 phin coffee ≈ 150 mg (estimate; not directly measured).',src:'EFSA 2015'},
   water:{n:'Water',u:'ml',lim:false,v:t=>t.water,g:()=>T.water,how:()=>`Drinks ≈ 28 ml × ${fmt1(PROFILE.w)} kg ≈ ${fmt(T.water)} ml (about 80% of the 35 ml/kg total; the rest comes from food). Tea and coffee count; alcohol does not.`+(hasC('Gout')?' Gout: drink enough for ≥ 2 L of urine a day.':''),src:'Vietnam RDA 2016; EFSA 2010'},
@@ -791,7 +814,7 @@ function mealOf(n,h){
 function parse(text,h){
   // Tách theo dấu câu trước; chỉ tách tiếp theo "và/với/and/with" khi cả cụm không phải tên một món (vd "orange juice with honey").
   const bare=x=>{const w=fixTypos(norm(x)).split(' ');while(w.length>1&&LEAD.has(w[0]))w.shift();return w.join(' ')};
-  const parts=text.split(/,|;|\.(?!\d)|\+|&|\n/).map(s=>s.trim()).filter(Boolean)
+  const parts=text.replace(/(\d),(\d)/g,'$1.$2').split(/,|;|\.(?!\d)|\+|&|\n/).map(s=>s.trim()).filter(Boolean)
     .flatMap(p=>ALIAS.has(bare(p))?[p]:p.split(/\s(?:và|va|với|voi|kèm|kem|and|with|plus)\s/i)).map(s=>s.trim()).filter(Boolean);
   const meal=mealOf(norm(text),h),items=[];
   for(const raw of parts){
@@ -852,10 +875,12 @@ function mergeItems(items){
 /* ---------- maths ---------- */
 const withParts=it=>it.fid&&!it.guess&&!it.parts&&comboParts(it.fid)?{...it,parts:comboParts(it.fid)}:it;
 const flat=items=>items.flatMap(it=>it.parts&&!it.snap?it.parts.filter(p=>p.on).map(p=>({fid:p.fid,qty:p.qty*it.qty,size:it.size,sugar:it.sugar})):[it]);
-function itemVals(it){const o={};NUTR.forEach(k=>o[k]=0);if(it.snap){NUTR.forEach(k=>o[k]=+it.snap[k]||0);return o}if(!it.fid)return o;if(it.parts){for(const p of it.parts){if(!p.on)continue;const v=itemVals({fid:p.fid,qty:p.qty*it.qty,size:it.size,sugar:it.sugar});NUTR.forEach(n=>o[n]+=v[n])}return o}const f=FOOD[it.fid],k=it.qty*SIZES[it.size].k;
-  NUTR.forEach(n=>o[n]=(+f[n]||0)*k);if(isAlcohol(f))o.volume_ml=0;
-  if(it.sugar!=null&&it.sugar<100&&sugarAdj(f)){const cut=(+f.sugar_g||0)*k*(1-it.sugar/100)*.9;o.sugar_g-=cut;o.carb_g-=cut;o.kcal-=cut*4}return o}
-function sumItems(items){const o={};NUTR.forEach(k=>o[k]=0);for(const it of items){const v=itemVals(it);NUTR.forEach(k=>o[k]+=v[k])}return o}
+function itemVals(it){const o={};NUTRX.forEach(k=>o[k]=0);const fd=it.fid&&FOOD[it.fid];
+  // Nước dùng của món nước (phở, bún, canh) không phải nước uống → chỉ đồ uống mới góp ml
+  if(it.snap){NUTR.forEach(k=>o[k]=+it.snap[k]||0);if(fd&&!isDrink(fd))o.volume_ml=0;o.fsugar_g=freeSugItem(it)?o.sugar_g:0;return o}if(!it.fid)return o;if(it.parts){for(const p of it.parts){if(!p.on)continue;const v=itemVals({fid:p.fid,qty:p.qty*it.qty,size:it.size,sugar:it.sugar});NUTRX.forEach(n=>o[n]+=v[n])}return o}const f=FOOD[it.fid],k=it.qty*SIZES[it.size].k;
+  NUTR.forEach(n=>o[n]=(+f[n]||0)*k);if(isAlcohol(f)||!isDrink(f))o.volume_ml=0;
+  if(it.sugar!=null&&it.sugar<100&&sugarAdj(f)){const cut=(+f.sugar_g||0)*k*(1-it.sugar/100)*.9;o.sugar_g-=cut;o.carb_g-=cut;o.kcal-=cut*4}o.fsugar_g=freeSugItem(it)?o.sugar_g:0;return o}
+function sumItems(items){const o={};NUTRX.forEach(k=>o[k]=0);for(const it of items){const v=itemVals(it);NUTRX.forEach(k=>o[k]+=v[k])}return o}
 function waterOf(day){return day.water||0}
 function lvl(key,v){
   if(key==='na'){return v<=T.naGood?'green':v<=T.na?'amber':'red'}
@@ -867,14 +892,16 @@ function lvl(key,v){
 }
 /* Điểm 0–100 = 50 "không vượt" + 50 "ăn đủ". Chỉ số liên quan bệnh nền nặng gấp đôi. */
 function scoreDetail(t,items=[],partial=true){
-  const clamp=x=>Math.max(0,Math.min(1,x)),hour=new Date().getHours();
+  // Ngày của app bắt đầu lúc 4h sáng → 0h–4h vẫn là cuối ngày hôm trước, phần "ăn đủ" tính đủ 100%
+  const clamp=x=>Math.max(0,Math.min(1,x)),hour=new Date(Date.now()-4*3600e3).getHours()+4;
   const frac=partial?Math.max(.25,Math.min(1,(hour-6)/15)):1;
   const L=[
     ['na','Sodium',hasC('High blood pressure')?2:1,clamp((t.sodium_mg-T.naGood)/(1.5*T.na-T.naGood)),'sodium_mg'],
-    ['su','Sugar',hasC('Prediabetes')?2:1,clamp((t.sugar_g-T.suGood)/(1.5*T.su-T.suGood)),'sugar_g'],
-    ['kcal','Calories',1,clamp((t.kcal-T.kcal)/(.4*T.kcal)),'kcal'],
-    ['sat','Saturated fat',hasC('High cholesterol')?1.6:.8,clamp((t.satfat_g-T.sat)/(.6*T.sat)),'satfat_g'],
-    ['pu','Purine',hasC('Gout')?1.2:.3,clamp((t.purine_mg-T.pu)/(.6*T.pu)),'purine_mg'],
+    ['su','Sugar',hasC('Prediabetes')?2:1,clamp((t.fsugar_g-T.suGood)/(1.5*T.su-T.suGood)),'fsugar_g'],
+    ['kcal','Calories',1,clamp((t.kcal-T.kcal)/(.5*T.kcal)),'kcal'],
+    ['sat','Saturated fat',hasC('High cholesterol')?1.6:.8,clamp((t.satfat_g-T.sat)/(.5*T.sat)),'satfat_g'],
+    // Không có gout: purin chỉ để tham khảo (SPEC), không trừ điểm
+    ...(hasC('Gout')?[['pu','Purine',1.6,clamp((t.purine_mg-T.pu)/(.5*T.pu)),'purine_mg']]:[]),
     ['cf','Caffeine',.5,clamp((t.caffeine_mg-T.cf)/(.5*T.cf)),'caffeine_mg'],
   ];
   const A=[
@@ -994,11 +1021,11 @@ const SUGG={
   iron_mg:['pho_bo_tai','rau_muong_xao_toi','trung_luoc'],potassium_mg:['chuoi','nuoc_dua_tuoi','khoai_lang_luoc','bo'],vitc_mg:['oi','cam','buoi','du_du'],
   vitd_ug:['ca_hap','trung_luoc','sua_tuoi_khong_duong_180'],omega3_g:['ca_hap','ca_kho_to','canh_chua_ca','hat_dieu'],
 };
-const names=list=>ids(list).slice(0,3).map(id=>FOOD[id].name);
+const names=list=>ids(list).slice(0,3).map(id=>esc(FOOD[id].name));
 function analyse(n=state.period,offset=0){return analyseDays(HIST.slice(HIST.length-n-offset,HIST.length-offset))}
 function analyseDays(days){
   const n=Math.max(1,days.length),tots=days.map(dayTotals);
-  const avg={};NUTR.concat(['water']).forEach(k=>avg[k]=tots.reduce((s,t)=>s+t[k],0)/n);
+  const avg={};NUTRX.concat(['water']).forEach(k=>avg[k]=tots.reduce((s,t)=>s+t[k],0)/n);
   // Nhóm thực phẩm/nhãn/nguồn tính theo thành phần (bún + trứng cút + đậu hũ → có đạm nạc), không chỉ theo món chính
   const has=(it,k)=>flat([it]).some(p=>FOOD[p.fid]&&FOOD[p.fid].groups.includes(k));
   const g={};
@@ -1063,12 +1090,12 @@ function sidesFor(c,meal){if(meal==='Breakfast')return [];const cats=c.ids.map(i
 const enoughHist=()=>HIST.filter(h=>h.date>=new Date(today-7*864e5)).length>=3;
 function recentIds(n){const from=new Date(today-n*864e5),s=new Set();HIST.filter(h=>h.date>=from).forEach(h=>h.items.forEach(it=>s.add(it.fid)));todayItems().forEach(it=>s.add(it.fid));return s}
 function mealBudget(meal,useToday){
-  const sh=SHARE[meal]||.3,main=sh>=.25,t=useToday?totals():{kcal:0,sodium_mg:0,purine_mg:0,sugar_g:0,satfat_g:0};
+  const sh=SHARE[meal]||.3,main=sh>=.25,t=useToday?totals():{kcal:0,sodium_mg:0,purine_mg:0,sugar_g:0,fsugar_g:0,satfat_g:0};
   const left=(day,used,min)=>Math.max(min,Math.min(sh*day*1.15,day-used));
   return {sh,main,kcal:Math.max(main?250:100,Math.min(sh*T.kcal,T.kcal-t.kcal)),na:left(T.naGood,t.sodium_mg,main?250:100),
-    pu:hasC('Gout')?left(T.pu,t.purine_mg,main?60:20):Infinity,su:left(T.su,t.sugar_g,main?3:2),sat:left(T.sat,t.satfat_g,main?2:1),
+    pu:hasC('Gout')?left(T.pu,t.purine_mg,main?60:20):Infinity,su:left(T.su,t.fsugar_g,main?3:2),sat:left(T.sat,t.satfat_g,main?2:1),
     veg:main?(meal==='Breakfast'?60:150):0,pro:main?T.pro*sh*.85:0,fib:main?T.fib*sh*.7:0}}
-const freeSugarOf=items=>sumItems(items.filter(it=>{const f=FOOD[it.fid];return !(f.groups.includes('trai_cay')||/khong_duong/.test(it.fid))})).sugar_g;
+const freeSugarOf=items=>sumItems(items).fsugar_g;
 function evalOpt(items,B){const v=sumItems(items),fails=[],goods=[];let pen=0;
   if(hasC('Stomach')){const fl=flat(items);if(fl.some(i=>tasteFid('cay',i.fid)))pen+=25;if(fl.some(i=>tasteFid('chua',i.fid)))pen+=10}
   const over=(x,cap,lbl,u,w)=>{if(x>cap){pen+=(x-cap)/cap*w;if(x>cap*1.1)fails.push(`${lbl} ${fmt(x)}/${fmt(cap)}${u}`)}};
@@ -1126,9 +1153,10 @@ function ring(r,stroke,frac,col,track='rgba(255,255,255,.25)',sw=8){
   <circle cx="${r+sw/2}" cy="${r+sw/2}" r="${r}" fill="none" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${(Math.min(1,frac)*c).toFixed(1)} ${c.toFixed(1)}"/>`}
 const HCOL={green:'#FFFFFF',amber:'#FFD27A',red:'#FF9C94',blue:'#BFE0FF'};
 function renderHero(){
-  const t=totals(),s=score(t,true,todayItems());
-  $('#ringBig').innerHTML=`<button class="ringbtn" aria-label="Why score ${s}"><svg viewBox="0 0 104 104">${ring(46,0,s/100,'#fff','rgba(255,255,255,.22)',10)}</svg><div class="c"><div><b class="num">${s}</b><small>Score</small></div></div></button>`;
-  const M=[['kcal','Calories',t.kcal,T.kcal],['na','Sodium',t.sodium_mg,T.na],['su','Sugar',t.sugar_g,T.su],['cf','Caffeine',t.caffeine_mg,T.cf],['water','Water',t.water,T.water]];
+  // Chưa ghi món nào → chưa chấm điểm (SPEC 3.4), hiện "–"
+  const t=totals(),ti=todayItems(),s=ti.length?score(t,true,ti):'–';
+  $('#ringBig').innerHTML=`<button class="ringbtn" aria-label="Why score ${s}"><svg viewBox="0 0 104 104">${ring(46,0,(+s||0)/100,'#fff','rgba(255,255,255,.22)',10)}</svg><div class="c"><div><b class="num">${s}</b><small>Score</small></div></div></button>`;
+  const M=[['kcal','Calories',t.kcal,T.kcal],['na','Sodium',t.sodium_mg,T.na],['su','Sugar',t.fsugar_g,T.su],['cf','Caffeine',t.caffeine_mg,T.cf],['water','Water',t.water,T.water]];
   $('#minis').innerHTML=M.map(([k,n,v,g])=>{const c=lvl(k,v);return `<button class="mini" data-m="${k}"><svg viewBox="0 0 44 44">${ring(18,0,v/g,HCOL[c],'rgba(255,255,255,.22)',5)}</svg>${n}<span class="v num">${Math.round(v/g*100)}%</span></button>`}).join('');
   $('#slim').innerHTML=`<span class="hpill num">Score ${s}</span><span class="dots">${M.map(([k,,v])=>`<span class="d ${lvl(k,v)}"></span>`).join('')}</span>`;
   $('#waterLvl').style.setProperty('--lvl',Math.min(100,t.water/T.water*100)+'%');
@@ -1159,7 +1187,7 @@ function chipHTML(ref,it){
   if(it.guess)return `<button class="chip guess" data-ref="${ref}" title="Best guess, tap to confirm"><span class="fi ${itemLevel(v)}">${svg(iconKey(f))}</span>${nm}<span class="q">?</span></button>`;
   const sg=it.sugar!=null&&it.sugar!==100&&sugarAdj(f)?`<span class="sz">${it.sugar}% sugar</span>`:'';
   const al=amtLbl(f,it);
-  const extra=sg+(it.parts?`<span class="sz">${it.parts.filter(p=>p.on&&!p.hid).length} ingredients</span>`:al?`<span class="sz">${al}</span>`:(it.size==='M'?'':`<span class="sz">${sizeLbl(f,it.size)}</span>`));
+  const extra=(AIEST.has(it.fid)?'<span class="sz" title="Estimated by AI, not yet confirmed">AI est.</span>':'')+sg+(it.parts?`<span class="sz">${it.parts.filter(p=>p.on&&!p.hid).length} ingredients</span>`:al?`<span class="sz">${al}</span>`:(it.size==='M'?'':`<span class="sz">${sizeLbl(f,it.size)}</span>`));
   return `<button class="chip${state.pick===ref?' sel':''}" data-ref="${ref}" title="${esc(f.portion_en||f.portion_label)} · ${fmt(v.kcal)} kcal"><span class="fi ${itemLevel(v)}">${svg(iconKey(f))}</span>${it.qty!==1&&!(al&&oddQty(it.qty))?quarter(it.qty)+'× ':''}${nm}${it.parts&&it.size!=='M'?`<span class="sz">${sizeLbl(f,it.size)}</span>`:''}${extra}</button>`;
 }
 const ROLE={starch:'Carbs',protein:'Protein',veg:'Veggies',sauce:'Dipping sauce'};
@@ -1217,7 +1245,7 @@ function comment(e,t,gp){
   if(t.caffeine_mg>T.cf&&v.caffeine_mg>0)return ['red',`Caffeine today ${fmt(t.caffeine_mg)}/${T.cf} mg`,'that is enough, make the next one water'];
   {const ts=tastesOf(e),sp=ts.includes('cay'),so=ts.includes('chua');
     if(hasC('Stomach')&&(sp||so))return ['amber',sp&&so?'Spicy and sour':sp?'Spicy meal':'Sour meal',`${sp?'chili':'acidic food'} can upset your stomach, eat it with rice or veggies and go easy`]}
-  if(t.sugar_g>T.su&&v.sugar_g>8)return ['amber',`Sugar today ${fmt(t.sugar_g)}/${T.su} g`,'next time choose less or no sugar'];
+  if(t.fsugar_g>T.su&&v.fsugar_g>8)return ['amber',`Sugar today ${fmt(t.fsugar_g)}/${T.su} g`,'next time choose less or no sugar'];
   if(v.caffeine_mg>0&&+e.t.slice(0,2)>=15)return ['amber','Caffeine after 3 pm','may hurt sleep, try mild tea next time'];
   if(fill.length)return ['green','Good','covers '+fill.slice(0,2).join(', ')+' this week'];
   if(v.kcal>800)return ['amber','Energy-heavy meal','keep dinner light'];
@@ -1250,7 +1278,7 @@ if(BOOT&&BOOT.settings)for(const k in BOOT.settings){const v=BOOT.settings[k];if
 const revWeek=()=>{const off=today.getDay()===0&&new Date().getHours()>=18?0:1,r=periodRange('week',off);return {off,r,key:isoD(r.from)}};
 const wkRange=key=>{const [y,m,d]=key.split('-').map(Number);return {from:new Date(y,m-1,d),to:new Date(y,m-1,d+6)}};
 function weekData(days,pdays){const a=analyseDays(days),nm=id=>shortName(FOOD[id]);
-  const M=[['Calories','kcal',T.kcal,'kcal',1],['Sodium','sodium_mg',T.na,'mg',1],['Sugar','sugar_g',T.su,'g',1],['Saturated fat','satfat_g',T.sat,'g',1],
+  const M=[['Calories','kcal',T.kcal,'kcal',1],['Sodium','sodium_mg',T.na,'mg',1],['Sugar','fsugar_g',T.su,'g',1],['Saturated fat','satfat_g',T.sat,'g',1],
     ['Caffeine','caffeine_mg',T.cf,'mg',1],['Water','water',T.water,'ml',0],['Protein','protein_g',T.pro,'g',0],['Fiber','fiber_g',T.fib,'g',0],['Vegetables','veg_g',150,'g',0]];
   return {days:days.length,score:avgOf(a.scores),prev_score:pdays.length?avgOf(analyseDays(pdays).scores):null,
     metrics:M.filter(([,k,,,lim])=>!lim||a.avg[k]>0).map(([name,k,target,unit,lim])=>({name,avg:Math.round(a.avg[k]),target:Math.round(target),unit,lim:!!lim})),
@@ -1316,7 +1344,7 @@ function suggCard(e){
 /* ---------- "What to drink now?" — luật cố định, không dùng AI ----------
    Còn bao nhiêu đường/caffeine hôm nay, sau 15h tránh caffeine, nước đang thiếu so với giờ trong ngày, bệnh nền, đồ uống quen. */
 function drinkList(){
-  const t=totals(),h=new Date().getHours(),late=h>=15,suL=Math.max(0,T.su-t.sugar_g),cfL=Math.max(0,T.cf-t.caffeine_mg);
+  const t=totals(),h=new Date().getHours(),late=h>=15,suL=Math.max(0,T.su-t.fsugar_g),cfL=Math.max(0,T.cf-t.caffeine_mg);
   const due=T.water*Math.min(1,Math.max(0,(h-7)/14)),short=due-t.water,had=new Set(todayItems().map(i=>i.fid)),out=[];
   const b=state.bottles.find(x=>x.def)||state.bottles[0];
   out.push({water:b,name:`Water · 1 ${b.name.toLowerCase()}`,v:{kcal:0,sugar_g:0,caffeine_mg:0,volume_ml:b.ml},fails:[],
@@ -1345,7 +1373,7 @@ function drinkCard(e){
       <span class="mtxt"><span class="mn">${esc(o.name)}</span><span class="mw num${o.fails.length?' warn':''}">${esc(o.why)}</span>
         <span class="mw num wrap">${o.water?`${fmt(o.v.volume_ml)} ml`:`${fmt(o.v.kcal)} kcal · ${fmt(o.v.volume_ml)} ml`}</span></span></div>
       ${e.done[o.name]?`<span class="eat done" aria-label="Logged">${svg('check',16)}</span>`:`<button class="eat" data-dseat="${e.id}|${i}" aria-label="Drink this: ${esc(o.name)}">${svg('check',16)}</button>`}</div>`).join('');
-  const head=`Today: sugar ${fmt(t.sugar_g)}/${T.su} g · caffeine ${fmt(t.caffeine_mg)}/${T.cf} mg · water ${fmt(t.water)}/${fmt(T.water)} ml${new Date().getHours()>=15?' · no caffeine after 3 pm':''}.`;
+  const head=`Today: sugar ${fmt(t.fsugar_g)}/${T.su} g · caffeine ${fmt(t.caffeine_mg)}/${T.cf} mg · water ${fmt(t.water)}/${fmt(T.water)} ml${new Date().getHours()>=15?' · no caffeine after 3 pm':''}.`;
   return `<div class="card"><h5>Drink ideas<small>Tap ✓ to log it</small></h5><div class="foods num">${head}</div><div class="mlist">${rows}</div>
     ${n>3?`<button class="linkbtn" data-smore="${e.id}">Other ideas</button>`:''}</div>`}
 function askDrink(raw){state.entries.push({id:nid(),kind:'ask',text:raw,fresh:true});state.entries.push({id:nid(),kind:'card',type:'drink',off:0,t:nowT(),fresh:true});state.pick=null;state.hold=null;renderAll()}
@@ -1508,13 +1536,13 @@ function autoGuess(it){if(it.fid||!it.name)return it;const q=norm(it.name),w=q.s
 function addFoodLive(o){if(!o||!o.id)return null;if(FOOD[o.id])return FOOD[o.id];
   const L=v=>Array.isArray(v)?v:String(v||'').split('|').map(x=>x.trim()).filter(Boolean),f={};
   RAW.cols.forEach(c=>{const v=o[c];f[c]=Array.isArray(v)?v.join('|'):(v==null?'':v)});f.al=L(o.aliases);f.groups=L(o.groups);f.tags=L(o.tags);
-  FOODS.push(f);FOOD[f.id]=f;f.al.forEach(a=>{if(!ALIAS.has(a))ALIAS.set(a,f)});return f}
+  FOODS.push(f);FOOD[f.id]=f;AIEST.add(f.id);f.al.forEach(a=>{if(!ALIAS.has(a))ALIAS.set(a,f)});return f}
 async function lookupUnknown(e){if(!LIVE)return;
   for(const it of e.items){if(it.fid||it.kept||!it.name||it.looking)continue;it.looking=true;renderAll(false);
-    try{const j=await api('estimateFood',{name:it.name}),f=addFoodLive(j.food);
+    try{const j=await api('estimateFood',{name:it.name},170000),f=addFoodLive(j.food);
       if(f&&e.items.includes(it)){const nw=withParts({fid:f.id,qty:it.qty,size:it.size||'M',guess:true,name:it.name});delete it.looking;Object.assign(it,nw);
         renderAll(false);showToast(`Gemini estimated “${shortName(f)}” · tap ? to confirm`,false)}}
-    catch(err){delete it.looking;renderAll(false)}}}
+    catch(err){delete it.looking;renderAll(false);showToast(`Couldn't estimate “${it.name}” — ${err.message}`,false)}}}
 function addToHist(e){const t=yday().getTime();let d=HIST.find(h=>h.date.getTime()===t);
   if(!d){d={date:yday(),items:[],water:0};HIST.push(d);HIST.sort((a,b)=>a.date-b.date)}
   d.items=d.items.filter(it=>it.mid!==e.id);d.items.push(...e.items.filter(it=>it.fid).map(it=>({...it,meal:e.meal,mid:e.id,react:e.react||''})))}
@@ -1683,7 +1711,7 @@ function ibTap(btn){const ref=btn.closest('.ibar').dataset.ref,r=refGet(ref),it=
   else if(k==='sugar')it.sugar=+val;
   else if(k==='part'){const p=it.parts[+val];p.on=!p.on;if(!it.parts.some(q=>q.on))p.on=true}
   else if(k==='del'){r.list.splice(r.i,1);state.pick=null}
-  else if(k==='pick'){const nf=FOOD[val],key=norm(it.name||'');if(key&&!ALIAS.has(key)){nf.al.push(key);ALIAS.set(key,nf);if(LIVE)enqueue('alias:'+key,'confirmFood',{food_id:val,alias:key})}
+  else if(k==='pick'){const nf=FOOD[val],key=norm(it.name||'');if(key&&!ALIAS.has(key)){nf.al.push(key);ALIAS.set(key,nf);if(LIVE)enqueue('alias:'+key,'confirmFood',{food_id:val,alias:key});AIEST.delete(val)}
     r.list[r.i]=applyHabits(withParts({fid:val,qty:it.qty,size:it.size||'M'}));state.pick=null}
   else if(k==='add'){if(!it.parts)it.parts=[{fid:it.fid,qty:1,on:true}];const ex=it.parts.find(p=>p.fid===val);if(ex)ex.on=true;else it.parts.push({fid:val,qty:1,on:true})}
   else if(k==='keep'){r.list[r.i]={fid:null,name:it.name,qty:it.qty,size:'M',kept:true};state.pick=null}
@@ -1983,7 +2011,7 @@ const histIn=r=>{const out=HIST.filter(d=>d.date>=r.from&&d.date<=r.to&&d.date<t
 const avgOf=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null;
 /* Ngưỡng tính "ngày vượt" theo mục tiêu cá nhân; dòng liên quan bệnh nền in đậm. */
 function overRows(tots){
-  const R=[['Sugar',t=>t.sugar_g>T.su,'Prediabetes','dessert'],['Sodium',t=>t.sodium_mg>T.na,'High blood pressure','dip'],['Calories',t=>t.kcal>T.kcal*1.1,'','bowl'],
+  const R=[['Sugar',t=>t.fsugar_g>T.su,'Prediabetes','dessert'],['Sodium',t=>t.sodium_mg>T.na,'High blood pressure','dip'],['Calories',t=>t.kcal>T.kcal*1.1,'','bowl'],
     ['Saturated fat',t=>t.satfat_g>T.sat,'High cholesterol','skewer'],['Caffeine > 400 mg',t=>t.caffeine_mg>T.cf,'','coffee'],...(hasC('Gout')?[['Purine',t=>t.purine_mg>T.pu,'Gout','shrimp']]:[]),
     ['Low water',t=>t.water<T.water*.9,'','drop'],['Low veg (< 150 g)',t=>t.veg_g<150,'','leaf']];
   return R.map(([n,f,c,ic])=>({n,ic,c:tots.filter(f).length,cond:c&&hasC(c)})).sort((x,y)=>y.c-x.c)}
@@ -2019,7 +2047,7 @@ function renderDay(off){
   const t=dayTotals(d),sd=scoreDetail(t,d.items,off===0),lost=sd.parts.filter(p=>p.lost>=.5).sort((a,b)=>b.lost-a.lost).slice(0,3);
   const meals=MEALS.map(m=>[m,d.items.filter(it=>(it.meal||'')===m)]).filter(([,its])=>its.length);
   const nm=it=>it.fid?shortName(FOOD[it.fid]):it.name;
-  const tg=[['Calories','kcal',T.kcal,'kcal',1,'bowl'],['Sodium','sodium_mg',T.na,'mg',1,'dip'],['Sugar','sugar_g',T.su,'g',1,'dessert'],['Water','water',T.water,'ml',0,'drop'],['Protein','protein_g',T.pro,'g',0,'egg'],['Fiber','fiber_g',T.fib,'g',0,'grain'],
+  const tg=[['Calories','kcal',T.kcal,'kcal',1,'bowl'],['Sodium','sodium_mg',T.na,'mg',1,'dip'],['Sugar','fsugar_g',T.su,'g',1,'dessert'],['Water','water',T.water,'ml',0,'drop'],['Protein','protein_g',T.pro,'g',0,'egg'],['Fiber','fiber_g',T.fib,'g',0,'grain'],
     ...(t.caffeine_mg>0?[['Caffeine','caffeine_mg',T.cf,'mg',1,'coffee']]:[]),...(hasC('Gout')?[['Purine','purine_mg',T.pu,'mg',1,'shrimp']]:[])];
   const trow=([n,k,g,u,lim,ic])=>{const v=t[k],r=v/g,c=lim?(r<=1?'green':r<=1.15?'amber':'red'):(r>=.9?'green':r>=.6?'amber':'red');
     // Bấm 1 chỉ số (trừ nước) → xem từng bữa, từng món góp bao nhiêu
@@ -2168,13 +2196,14 @@ function openProfileForm(){
     else{Pf[g]=g==='act'?+b.dataset.v:b.dataset.v;b.parentElement.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))}prev()});
   $('#pForm').addEventListener('submit',ev=>{ev.preventDefault();const r=read(),err=[];
     if(!(r.born>=1930&&r.born<=2015))err.push('birth year 1930–2015');if(!(r.h>=120&&r.h<=220))err.push('height 120–220 cm');if(!(r.w>=30&&r.w<=250))err.push('weight 30–250 kg');
+    if(!['Male','Female'].includes(Pf.sex))err.push('sex');if(!ACTS.some(a=>a[0]===+Pf.act))err.push('activity level');
     if(err.length){$('#pErr').hidden=false;$('#pErr').textContent='Please check: '+err.join(', ')+'.';return}
     const old=T.kcal;Object.assign(PROFILE,Pf,r,{mine:true});
     try{localStorage.setItem('bh_profile',JSON.stringify({born:PROFILE.born,sex:PROFILE.sex,h:PROFILE.h,w:PROFILE.w,act:PROFILE.act,cond:PROFILE.cond}))}catch(e){}
     recalc();state.menu=buildMenu();closeSheet();renderProfile();renderAll(false);showToast(`New target: ${fmt(T.kcal)} kcal (was ${fmt(old)}) · water ${fmt(T.water)} ml`,false)});
 }
 function resetProfile(){try{localStorage.removeItem('bh_profile')}catch(e){}
-  Object.assign(PROFILE,{born:1990,sex:'Male',h:170,w:71,act:1.375,cond:['Gout','Prediabetes','High cholesterol','High blood pressure'],mine:false});recalc();state.menu=buildMenu();renderProfile();renderAll(false);showToast('Back to sample numbers',false)}
+  Object.assign(PROFILE,{...PROFILE_SAMPLE,cond:[],mine:false});recalc();state.menu=buildMenu();renderProfile();renderAll(false);showToast('Back to sample numbers',false)}
 const BCOLORS=['#2477E8','#1E9E62','#18908A','#E8862A','#D64545','#8E6BBF'];
 function openBottleForm(b){
   const ed=!!b;let ml=ed?b.ml:500,color=ed?b.color:'#18908A',def=ed?!!b.def:false;
@@ -2208,43 +2237,73 @@ function openBottleForm(b){
 const SYNC={meals:{},water:'',weights:{},profile:'',bottles:'',habits:'',summary:''};
 let OUTBOX=[];try{OUTBOX=JSON.parse(localStorage.getItem('bh_outbox')||'[]')||[]}catch(e){}
 let syncErr='',flushing=false,persistT=0,touched=false,newData=false,bootAt=0;
-const saveOutbox=()=>{try{localStorage.setItem('bh_outbox',JSON.stringify(OUTBOX))}catch(e){}};
+let storeWarned=false;const storeFull=()=>{if(!storeWarned){storeWarned=true;showToast('Phone storage is full — free some space or changes may be lost',false)}};
+const saveOutbox=()=>{try{localStorage.setItem('bh_outbox',JSON.stringify(OUTBOX))}catch(e){storeFull()}};
+/* Nước gửi theo phần chênh: base = số ly máy này biết lúc đồng bộ xong lần trước → server cộng phần chênh vào số hiện có,
+   không ghi đè ly đã nhập ở máy khác hoặc trước khi tải xong dữ liệu mới. */
+let WBASE=null,WROTE=new Set();
+const saveWBase=()=>{try{localStorage.setItem('bh_wbase',JSON.stringify(WBASE))}catch(e){}};
 function syncText(){return OUTBOX.length?`${OUTBOX.length} change${OUTBOX.length>1?'s':''} waiting to sync${syncErr?' · '+syncErr:''}`:'All changes saved'}
 function showSync(){const el=document.getElementById('syncState');if(el)el.textContent=syncText()}
-function enqueue(k,fn,arg){const i=OUTBOX.findIndex(x=>x.k===k);if(i>=0)OUTBOX.splice(i,1);OUTBOX.push({k,fn,arg});saveOutbox();showSync();setTimeout(flush,50)}
+function enqueue(k,fn,arg){const i=OUTBOX.findIndex(x=>x.k===k);if(i>=0)OUTBOX[i]={k,fn,arg};else OUTBOX.push({k,fn,arg});saveOutbox();showSync();setTimeout(flush,50)}
 function apiKey(){try{return localStorage.getItem('bh_key')||''}catch(e){return ''}}
 function askKey(){const k=prompt('Enter your Bony Health access key');if(k&&k.trim()){try{localStorage.setItem('bh_key',k.trim())}catch(e){}return true}return false}
-async function api(fn,arg){
+/* Lỗi API có code: invalid (dữ liệu sai, gửi lại cũng hỏng) · unauthorized · locked · busy (Google bận/khoá ghi, thử lại được).
+   Server cũ chưa có code → đoán theo chữ. Lỗi mạng/HTML không có code. */
+const errCode=j=>j.code||(j.error==='Unauthorized'?'unauthorized':/Too many wrong keys/.test(j.error||'')?'locked':/^(Invalid|Unknown bottle|Missing|Bad|Not found)/i.test(j.error||'')?'invalid':'busy');
+async function api(fn,arg,ms=90000){
   const q=encodeURIComponent(JSON.stringify({fn,args:[arg||{}],key:apiKey()}));
-  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),90000);
+  const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),ms);
   try{const r=await fetch(BH_API+'?q='+q+'&_='+Date.now(),{redirect:'follow',cache:'no-store',signal:ctl.signal});const t=await r.text();
     let j;try{j=JSON.parse(t)}catch(e){throw new Error('Google server busy')}
-    if(!j.__ok){const er=new Error(j.error||'Error');er.api=true;throw er}return j}
+    if(!j.__ok){const er=new Error(j.error||'Error');er.api=true;er.code=errCode(j);throw er}return j}
   finally{clearTimeout(tm)}}
-async function flush(){if(flushing||!OUTBOX.length)return;flushing=true;
-  try{while(OUTBOX.length){const x=OUTBOX[0];
-    try{await api(x.fn,x.arg);syncErr='';const i=OUTBOX.indexOf(x);if(i>=0)OUTBOX.splice(i,1);saveOutbox()}
-    catch(e){syncErr=e.message==='Unauthorized'?'access key needed':(e.api?e.message:'offline');
-      if(e.message==='Unauthorized'&&askKey())continue;
-      if(e.api&&e.message!=='Unauthorized'){OUTBOX.shift();saveOutbox();showToast('Could not save: '+e.message,false);continue}
-      setTimeout(flush,20000);break}}}
+let retryT=0,keyAsked=false;
+const withBase=a=>WBASE&&WBASE.date===a.date?{...a,base:{counts:WBASE.counts,extra:WBASE.extra}}:a;
+function waterSaved(a,res){WBASE={date:a.date,counts:{...a.counts},extra:a.extra};
+  // Server trả số sau khi cộng (có ly từ máy khác) → hiện đúng số đó, nếu không còn thay đổi nước nào đang chờ
+  if(res&&res.counts&&a.date===TODAY&&!OUTBOX.some(o=>o.fn==='saveWater'&&o.arg.date===a.date)){
+    const c={...res.counts},x=+res.extra||0;WBASE={date:a.date,counts:c,extra:x};
+    if(wNorm(c)!==wNorm(state.counts)||x!==state.extra){state.counts={...c};state.extra=x;SYNC.water=hashOf({date:TODAY,counts:{...state.counts},extra:state.extra});renderAll(false)}}
+  saveWBase()}
+async function flush(){if(flushing||!OUTBOX.length)return;flushing=true;clearTimeout(retryT);
+  try{while(OUTBOX.length){
+    // Bình gửi trước: nước của bình mới sẽ bị server từ chối nếu bình chưa có trên Sheet
+    const x=OUTBOX.find(o=>o.fn==='saveBottles')||OUTBOX[0];
+    try{const res=await api(x.fn,x.fn==='saveWater'?withBase(x.arg):x.arg);syncErr='';const i=OUTBOX.indexOf(x);if(i>=0)OUTBOX.splice(i,1);saveOutbox();
+      if(x.fn==='saveWater')waterSaved(x.arg,res);if(x.arg&&x.arg.id)WROTE.add(x.arg.id)}
+    catch(e){
+      // Sai/thiếu key: hỏi 1 lần, không tự gửi lại liên tục (mỗi lần sai key bị đếm, 10 lần là API khoá 1 giờ)
+      // Server mới: "locked" chỉ trả cho key sai (key đúng luôn qua) → cũng hỏi lại key
+      if(e.code==='unauthorized'||e.code==='locked'){syncErr=e.code==='locked'?'wrong access key (locked for 1 hour)':'access key needed';if(!keyAsked){keyAsked=true;if(askKey())continue}break}
+      // Chỉ bỏ khi dữ liệu sai (gửi lại cũng hỏng); khoá/bận/mất mạng thì giữ nguyên để gửi lại, không mất món
+      if(e.code==='invalid'){const i=OUTBOX.indexOf(x);if(i>=0)OUTBOX.splice(i,1);saveOutbox();showToast('Could not save: '+e.message,false);continue}
+      x.fails=(x.fails||0)+1;
+      // 1 mục lỗi mạng mãi (vd URL quá dài) → cho xuống cuối, không chặn các mục sau
+      if(!e.code&&x.fails>=6&&OUTBOX.length>1){const i=OUTBOX.indexOf(x);if(i>=0){OUTBOX.splice(i,1);OUTBOX.push(x)}}
+      saveOutbox();syncErr=e.code==='busy'?'Google busy, retrying':'offline';
+      retryT=setTimeout(flush,Math.min(5*60e3,20e3*2**Math.min(4,x.fails-1)));break}}}
   finally{flushing=false;showSync()}}
 addEventListener('online',()=>flush());
 // Quay lại app (PWA chạy nền không tự tải lại) → đẩy thay đổi rồi lấy dữ liệu mới, để thấy món nhập trên máy khác
-document.addEventListener('visibilitychange',()=>{if(document.hidden||!LIVE)return;
-  // Mở lại sau 4 giờ sáng của ngày mới → tải lại, nếu không món mới vẫn bị ghi vào ngày cũ
+const persistNow=()=>{clearTimeout(persistT);try{persist()}catch(e){}};
+addEventListener('pagehide',()=>{if(LIVE)persistNow()});
+document.addEventListener('visibilitychange',()=>{if(!LIVE)return;if(document.hidden){persistNow();return}keyAsked=false;
+  // Mở lại sau 4 giờ sáng của ngày mới → tải lại ngay kể cả còn hàng chờ (hàng chờ lưu trên máy, mở lại gửi tiếp), nếu không món mới bị ghi vào ngày cũ
   const dayNow=isoD(new Date(Date.now()-4*3600e3));
-  flush().then(()=>{if(OUTBOX.length)return;if(newData||dayNow!==TODAY)location.reload();else if(Date.now()-bootAt>60000){touched=false;refreshBoot()}})});
+  if(dayNow!==TODAY){persistNow();location.reload();return}
+  flush().then(()=>{if(OUTBOX.length)return;if(newData)location.reload();else if(Date.now()-bootAt>60000){touched=false;refreshBoot()}})});
 function mealPayload(e){return {id:e.id,date:e.date||TODAY,time:e.t,meal:e.meal,raw_text:e.text,reaction:e.react||'',
   items:e.items.map(it=>({fid:it.fid||null,name:it.name||'',qty:it.qty,size:it.size||'M',sugar:it.sugar??null,parts:it.parts||null,guess:!!it.guess,habit:it.habit||'',snap:itemVals(it)}))}}
 const hashOf=o=>JSON.stringify(o);
+const wNorm=o=>Object.keys(o||{}).filter(k=>+o[k]).sort().map(k=>k+':'+(+o[k])).join();
 function snapshot(){const meals={};state.entries.filter(e=>e.kind==='meal'&&e.items.length).forEach(e=>meals[e.id]=mealPayload(e));
   const t=totals();
   return {meals,water:{date:TODAY,counts:{...state.counts},extra:state.extra},
     weights:Object.fromEntries(WLOG.filter(w=>!w.sample).map(w=>[w.d,w.kg])),
     profile:PROFILE.mine?{born:PROFILE.born,sex:PROFILE.sex,h:PROFILE.h,w:PROFILE.w,act:PROFILE.act,cond:PROFILE.cond}:null,
     bottles:state.bottles.map(b=>({id:b.id,name:b.name,ml:b.ml,color:b.color,def:!!b.def})),habits:HABITS,
-    summary:{date:TODAY,score:score(t,true,todayItems()),water_ml:Math.round(t.water),water_goal:T.water,kcal:Math.round(t.kcal),kcal_goal:T.kcal}}}
+    summary:{date:TODAY,score:todayItems().length?score(t,true,todayItems()):null,water_ml:Math.round(t.water),water_goal:T.water,kcal:Math.round(t.kcal),kcal_goal:T.kcal}}}
 function markSynced(){const s=snapshot();for(const id in s.meals)SYNC.meals[id]=hashOf(s.meals[id]);SYNC.water=hashOf(s.water);SYNC.weights={...s.weights};
   SYNC.profile=hashOf(s.profile);SYNC.bottles=hashOf(s.bottles);SYNC.habits=hashOf(s.habits);SYNC.summary=hashOf(s.summary)}
 function persist(){const s=snapshot();
@@ -2270,17 +2329,28 @@ function liveBoot(){
     const w=WLOG.find(x=>x.d===TODAY);if(w){const prev=[...WLOG].reverse().find(x=>x.d<TODAY);state.entries.push({id:nid(),kind:'weight',t:'',text:`Weight ${fmt1(w.kg)} kg${prev?` · ${w.kg>prev.kg?'+':w.kg<prev.kg?'−':'±'}${fmt1(Math.abs(w.kg-prev.kg))} kg vs last time`:''} · BMI ${fmt1(BMI)}`})}}
   if(WLOG.length&&!(BOOT&&BOOT.profile&&BOOT.profile.w)){PROFILE.w=WLOG.at(-1).kg;recalc()}
   markSynced();
+  try{const wb=JSON.parse(localStorage.getItem('bh_wbase')||'null');
+    WBASE=wb&&wb.date===TODAY&&OUTBOX.some(o=>o.fn==='saveWater'&&o.arg.date===TODAY)?wb:{date:TODAY,counts:{...state.counts},extra:state.extra}}catch(e){}
+  saveWBase();
   if(!apiKey())askKey();
   flush().then(refreshBoot);
 }
 async function refreshBoot(){
   bootAt=Date.now();
   try{const j=await api('getBootstrap',{});delete j.__ok;const old=localStorage.getItem('bh_boot'),nw=JSON.stringify(j);
-    try{localStorage.setItem('bh_boot',nw)}catch(e){}
+    let saved=true;try{localStorage.setItem('bh_boot',nw)}catch(e){
+      // Đầy bộ nhớ (lịch sử dài) → giữ 120 ngày gần nhất trên máy; vẫn lỗi thì thôi, không tự tải lại (tránh vòng lặp)
+      try{const cut=isoD(new Date(Date.now()-120*864e5)),k={...j};k.meals=(j.meals||[]).filter(m=>m[1]>=cut);const ids=new Set(k.meals.map(m=>m[0]));
+        k.items=(j.items||[]).filter(r=>ids.has(r[0]));k.water=(j.water||[]).filter(r=>r[0]>=cut);localStorage.setItem('bh_boot',JSON.stringify(k))}
+      catch(e2){saved=false;storeFull()}}
     // Có dữ liệu mới (máy khác, sửa trên Sheet, lần mở đầu) và chưa thao tác gì → nạp lại để dựng từ dữ liệu mới
     const strip=x=>{try{const o=JSON.parse(x);delete o.today;delete o.settings;return JSON.stringify(o)}catch(e){return ''}};
     // Đang thao tác dở thì không tự tải lại, chỉ báo và để bạn bấm
-    if(strip(old)!==strip(nw)){if(!touched&&!OUTBOX.length)location.reload();else{newData=true;showToast('New data from your other device',false,{label:'Load',fn:()=>{if(!OUTBOX.length)location.reload();else flush().then(()=>location.reload())}})}}}
+    // Chỉ khác vì món chính máy này vừa ghi (không có bữa lạ, nước hôm nay khớp) → không cần tải lại hay báo
+    const known=new Set(state.entries.map(e=>e.id).concat([...WROTE]));try{(JSON.parse(old||'{}').meals||[]).forEach(m=>known.add(m[0]))}catch(e){}
+    const wt={};let wx=0;for(const [d,b,c] of j.water||[])if(d===TODAY){if(b==='extra')wx+=+c||0;else wt[b]=+c||0}
+    const own=(j.meals||[]).every(m=>known.has(m[0]))&&wNorm(wt)===wNorm(state.counts)&&wx===state.extra;
+    if(saved&&strip(old)!==strip(nw)&&!own){if(!touched&&!OUTBOX.length)location.reload();else{newData=true;showToast('New data from your other device',false,{label:'Load',fn:()=>{if(!OUTBOX.length)location.reload();else flush().then(()=>location.reload())}})}}}
   catch(e){if(e.message==='Unauthorized'&&askKey())return refreshBoot();syncErr=e.api?e.message:'offline';showSync()}}
 
 /* Bàn phím trên iPhone: trình duyệt không co trang mà đẩy cả trang lên, để lại thanh tab và một khoảng trống trên bàn phím.
