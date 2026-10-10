@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon-180.png">
 <link rel="icon" href="icons/favicon-32.png">
 <script>
-const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261010135655";
+const BH_API="https://script.google.com/macros/s/AKfycbxmXOT7GAWVkj4wLEXILRasgaAU5p7tEtXkY4NbOOAxtXO9bujrspJYkEtOulK1c_Yb/exec", BH_BUILD="20261010144930";
 // Bản mới đã cài xong → tải lại ngay; mở lại app (iOS chỉ chạy tiếp, không mở lại trang) → hỏi bản mới
 if('serviceWorker' in navigator)addEventListener('load',()=>{const had=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)location.reload()});
@@ -143,10 +143,22 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .plate span{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:600;border-radius:999px;padding:2px 8px}
 .plate .on{background:var(--green-soft);color:var(--green)}
 .plate .off{background:var(--raised);color:var(--faint);text-decoration:line-through;text-decoration-thickness:1px}
-.chip.guess{border:1px dashed var(--amber)}
-.chip .q{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--amber-soft);color:var(--amber);font-size:10.5px;font-weight:700}
 .chip.unknown .fi{background:var(--amber-soft);color:var(--amber);font-weight:700;font-size:12px}
 .says{font-size:13px;color:var(--muted);line-height:1.4}
+/* Thẻ bữa ăn kiểu Telegram (D63): tên món + kcal trên cùng, thành phần chữ xám, 1 dòng nhận xét có chấm màu, bữa + giờ ở góc dưới phải trong thẻ */
+.card.meal{gap:6px;padding:10px 12px 7px}
+.card.meal .mhead{display:flex;align-items:flex-start;gap:8px;min-width:0}
+.card.meal .mhead .chips{flex:1;min-width:0;gap:4px 10px}
+.card.meal .kc{flex:none;font-size:13px;font-weight:600;color:var(--ink);padding-top:5px}
+.card.meal .chip{background:transparent;padding:1px 6px 1px 0;border-radius:12px;font-size:14.5px;font-weight:600}
+.card.meal .chip .en{font-weight:400}
+.card.meal .chip.sel{background:var(--green-soft);padding-right:8px}
+.card.meal .parts{font-size:12.5px;line-height:1.45}
+.card.meal .parts b{font-weight:600;color:var(--ink)}
+.card.meal .says{font-size:12.5px}
+.card.meal .says::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--faint);margin-right:6px;vertical-align:1px}
+.card.meal .says.red::before{background:var(--red)}.card.meal .says.amber::before{background:var(--amber)}.card.meal .says.green::before{background:var(--green)}
+.card.meal .meta{justify-self:end;padding-left:0;margin-top:-2px}
 .says b{font-weight:600;color:var(--ink)}
 .says.red b{color:var(--red)} .says.amber b{color:var(--amber)} .says.green b{color:var(--green)}
 .pop{animation:pop .4s cubic-bezier(.2,.9,.3,1.2) both}
@@ -213,6 +225,43 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .tray-f{display:flex;justify-content:space-between;align-items:center;gap:8px}.tray-f .foods{flex:1;min-width:0;line-height:1.35}
 .tray-b{display:flex;gap:6px;flex:none}
 .seg.s3{grid-template-columns:repeat(3,1fr)}
+/* Bảng sửa món (D64): một kiểu nút cho từng phần, tiêu đề nhỏ, Done/Delete ở đáy */
+.ibar.isheet{display:grid;gap:16px}
+.card.meal[data-card]{cursor:pointer}
+.is-tabs{margin:-2px -18px 0;padding:0 18px}
+.is-h{display:flex;align-items:center;gap:12px}
+.is-h .fi{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none}
+.is-h .fi.q{background:var(--amber-soft);color:var(--amber);font-weight:700}
+.is-t{flex:1;min-width:0;display:grid}
+.is-t small{font-size:12.5px;color:var(--faint)}
+.is-h>b{font-family:var(--display);font-size:17px;font-weight:600;white-space:nowrap}
+.isheet .sub{margin:-10px 0 0}
+.isheet .sub i{font-style:normal;color:var(--green)}
+.is-sec{display:grid;gap:8px}
+.isheet .seg button{display:grid;place-content:center;line-height:1.15}
+.isheet .seg small{font-size:11px;font-weight:500;color:var(--faint)}
+.is-parts{display:flex;flex-wrap:wrap;gap:6px}
+.is-part{display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:6px 12px 6px 10px;border-radius:12px;background:var(--raised);font-size:13.5px;text-align:left;max-width:100%}
+.nm2{display:grid;min-width:0;line-height:1.25}.nm2>*{white-space:nowrap}.nm2 small{font-size:11px;color:var(--faint);font-weight:400}
+.is-part .ck{width:20px;height:20px;border-radius:6px;display:grid;place-items:center;flex:none;border:1.5px solid var(--faint);color:#fff}
+.is-part[aria-pressed="true"] .ck{background:var(--green);border-color:var(--green)}
+.is-part[aria-pressed="false"]{color:var(--faint)}
+.is-part.hid{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
+.is-add{display:flex;flex-wrap:wrap;gap:6px}
+.is-add button{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:4px 12px 4px 10px;border-radius:12px;background:var(--raised);font-size:13px;text-align:left;max-width:100%}.is-add button>b{color:var(--blue);font-weight:600;font-size:17px;line-height:1}
+.is-add .own{color:var(--blue)}
+.ib-own{display:flex;gap:6px;align-items:center}
+.ib-own input{flex:1;min-width:0;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--raised);padding:0 12px;font:inherit;font-size:16px;color:var(--ink)}
+.ib-own .is-done{height:40px;padding:0 18px}
+.is-opts{display:grid;gap:6px}
+.is-opts button{display:flex;align-items:center;gap:10px;min-height:46px;padding:0 12px;border-radius:12px;background:var(--raised);text-align:left;font-size:14px}
+.is-opts>button>small{margin-left:auto;color:var(--faint);font-size:12px;flex:none}
+.is-opts .rd{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--faint);flex:none;box-sizing:border-box}
+.is-opts [aria-pressed="true"] .rd{border:5px solid var(--green)}
+.is-foot{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.is-del{display:inline-flex;align-items:center;gap:6px;color:var(--red);font-size:14px;font-weight:500;height:44px}
+.is-ghost{color:var(--muted);font-size:14px;height:44px}
+.is-done{height:44px;padding:0 28px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-weight:600;font-size:15px}
 .sg svg{color:var(--green)}
 .qchips{display:flex;gap:6px;overflow-x:auto;padding:8px 12px 0;scrollbar-width:none;flex:none;background:var(--bg)}
 .qchips::-webkit-scrollbar{display:none}
@@ -281,30 +330,6 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 .stepper output{text-align:center;font-family:var(--display);font-size:22px;font-weight:600}
 .tags{display:flex;flex-wrap:wrap;gap:6px}
 .chip.sel{box-shadow:0 0 0 2px var(--green);background:var(--green-soft)}
-.ibar{display:grid;gap:8px;margin-top:8px;padding:10px;border-radius:16px;background:var(--raised);border:1px solid var(--line)}
-.ib-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ib-step{display:flex;align-items:center;background:var(--surface);border-radius:10px;border:1px solid var(--line)}
-.ib-step button{width:34px;height:34px;font-size:18px;color:var(--muted)}
-.ib-step b{min-width:24px;text-align:center;font-size:14px}
-.ib-seg{display:flex;align-items:center;gap:4px;flex:1;min-width:0;flex-wrap:wrap}
-.ib-seg button{height:32px;padding:0 10px;border-radius:9px;font-size:13px;background:var(--surface);border:1px solid var(--line)}
-.ib-seg button[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
-.ib-l{font-size:12px;color:var(--muted);margin-right:2px}
-.ib-del{width:34px;height:34px;border-radius:10px;color:var(--red);display:grid;place-items:center;margin-left:auto}
-.ib-parts{display:flex;flex-wrap:wrap;gap:6px}
-.ib-parts .tag{font-size:12.5px;padding:5px 10px}
-.ib-parts:not(.gopts) .tag[aria-pressed="false"]{color:var(--muted);text-decoration:line-through}
-.gopts .tag{background:var(--surface)}
-.ib-quick{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.ib-quick .tag.add{background:var(--surface);border:1px dashed var(--blue);color:var(--blue);font-size:12.5px;padding:5px 10px}
-.ib-quick .tag.own{border-style:solid;background:var(--blue-soft)}
-.ib-own{display:flex;gap:6px;align-items:center}
-.ib-own input{flex:1;min-width:0;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);padding:0 10px;font:inherit;font-size:16px;color:var(--ink)}
-.ib-own .btn-s{height:36px;padding:0 14px;border-radius:10px}
-.ib-parts .tag.hid{border:1px dashed var(--muted);background:transparent}
-.ib-f{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
-.ib-f i{font-style:normal;color:var(--green)}
-.ib-f button{color:var(--blue);font-size:12.5px;white-space:nowrap}
 .seg.s5{grid-template-columns:repeat(5,1fr)}
 .mealbtn{font:inherit;color:inherit;text-decoration:underline dotted;text-underline-offset:3px;padding:0}
 .mealrow{display:flex;gap:4px;flex-wrap:wrap;margin:6px 0 0 4px}
@@ -851,7 +876,8 @@ function parse(text,h){
       continue;
     }
     const m=findFood(seg),name=rt.join(' ');
-    items.push(m?opt({fid:m.f.id,qty,size:'M',...(m.exact?{}:{guess:true,name})}):{fid:null,name,qty,size:'M'});
+    // Khớp gần đúng cũng nhận luôn như món thường, sai thì người dùng chạm chip tự sửa (D62).
+    items.push(m?opt({fid:m.f.id,qty,size:'M'}):{fid:null,name,qty,size:'M'});
   }
   return {meal,items:mergeItems(items)};
 }
@@ -963,7 +989,7 @@ const isT=v=>v===true||v==='TRUE'||v==='true';
 /* Món đã lưu trên Sheet → cấu trúc món của app. Lịch sử dùng số chụp lúc lưu (snap), hôm nay tính lại để sửa được. */
 function itemFromRow(r){const [,fid,name,qty,size,sug,parts,guess,habit]=r,snap={};SNAPK.forEach((k,i)=>snap[k]=+r[9+i]||0);
   const ok=fid&&FOOD[fid];return {fid:ok?fid:null,name:ok?'':(name||fid||''),qty:+qty||1,size:size||'M',...(sug!==''&&sug!=null?{sugar:+sug}:{}),
-    ...(parseJ(parts)?{parts:parseJ(parts).filter(p=>FOOD[p.fid])}:{}),...(isT(guess)?{guess:true,name:name||''}:{}),...(habit?{habit}:{}),snap}}
+    ...(parseJ(parts)?{parts:parseJ(parts).filter(p=>FOOD[p.fid])}:{}),...(habit?{habit}:{}),snap}}
 if(LIVE&&BOOT){const byMeal={};(BOOT.items||[]).forEach(r=>(byMeal[r[0]]=byMeal[r[0]]||[]).push(r));
   const days={};for(const [id,date,,meal,,react] of BOOT.meals||[]){if(date>=TODAY)continue;const d=days[date]=days[date]||{date:dOf(date),items:[],water:0};
     (byMeal[id]||[]).forEach(r=>{const it=itemFromRow(r);if(it.fid)d.items.push({...it,meal,react:react||'',mid:id})})}
@@ -1184,10 +1210,9 @@ function amtLbl(f,it){if(it.parts)return '';const k=it.qty*SIZES[it.size].k,vol=
 function chipHTML(ref,it){
   if(!it.fid)return `<button class="chip unknown" data-ref="${ref}"><span class="fi">${it.looking?'…':'?'}</span>${esc(it.name)}${it.looking?'<span class="sz">Looking up…</span>':''}</button>`;
   const f=FOOD[it.fid],v=itemVals(it),nm=nameHTML(f);
-  if(it.guess)return `<button class="chip guess" data-ref="${ref}" title="Best guess, tap to confirm"><span class="fi ${itemLevel(v)}">${svg(iconKey(f))}</span>${nm}<span class="q">?</span></button>`;
   const sg=it.sugar!=null&&it.sugar!==100&&sugarAdj(f)?`<span class="sz">${it.sugar}% sugar</span>`:'';
   const al=amtLbl(f,it);
-  const extra=(AIEST.has(it.fid)?'<span class="sz" title="Estimated by AI, not yet confirmed">AI est.</span>':'')+sg+(it.parts?`<span class="sz">${it.parts.filter(p=>p.on&&!p.hid).length} ingredients</span>`:al?`<span class="sz">${al}</span>`:(it.size==='M'?'':`<span class="sz">${sizeLbl(f,it.size)}</span>`));
+  const extra=(AIEST.has(it.fid)?'<span class="sz" title="Estimated by AI, not yet confirmed">AI est.</span>':'')+sg+(it.parts?'':al?`<span class="sz">${al}</span>`:(it.size==='M'?'':`<span class="sz">${sizeLbl(f,it.size)}</span>`));
   return `<button class="chip${state.pick===ref?' sel':''}" data-ref="${ref}" title="${esc(f.portion_en||f.portion_label)} · ${fmt(v.kcal)} kcal"><span class="fi ${itemLevel(v)}">${svg(iconKey(f))}</span>${it.qty!==1&&!(al&&oddQty(it.qty))?quarter(it.qty)+'× ':''}${nm}${it.parts&&it.size!=='M'?`<span class="sz">${sizeLbl(f,it.size)}</span>`:''}${extra}</button>`;
 }
 const ROLE={starch:'Carbs',protein:'Protein',veg:'Veggies',sauce:'Dipping sauce'};
@@ -1214,8 +1239,10 @@ function roleOf(f){const r=[],id=f.id;
 function partsHTML(items){const seen=new Set(),lines=[];
   for(const it of items){if(!it.fid||seen.has(it.fid))continue;seen.add(it.fid);const f=FOOD[it.fid];
     const p=it.parts?it.parts.filter(x=>x.on&&!x.hid).map(x=>FOOD[x.fid].name.replace(/\s*\(.*?\)/,'').toLowerCase()):partsOf(f).map(x=>x[0]);
-    if(p.length>=2)lines.push(`<span><b>${esc(f.name.replace(/\s*\(.*?\)/,''))}</b> = ${p.map(esc).join(' · ')}</span>`)}
-  return lines.length?`<div class="parts">${lines.join('')}</div>`:''}
+    if(p.length>=2)lines.push({n:f.name.replace(/\s*\(.*?\)/,''),p})}
+  // 1 món → chỉ liệt kê thành phần (tên món đã ở trên); nhiều món → "Tên: …" để phân biệt
+  const one=lines.length===1;
+  return lines.length?`<div class="parts">${lines.map(l=>`<span>${one?'':`<b>${esc(l.n)}</b>: `}${(one?l.p.filter(x=>x!==l.n.toLowerCase()):l.p).map(esc).join(' · ')}</span>`).join('')}</div>`:''}
 function plateHTML(items){const fs=flat(items).filter(i=>i.fid).map(i=>FOOD[i.fid]);
   if(!fs.length||fs.every(f=>['ca_phe','tra','tra_sua','topping','nuoc_uong','sua','bia_ruou','trai_cay','che_trang_mieng','an_vat'].includes(f.category)))return '';
   const have=new Set(fs.flatMap(f=>[...roleOf(f),...partsOf(f).map(p=>p[1]).filter(Boolean)]));
@@ -1404,7 +1431,7 @@ function pastHTML(){
     h+=`<div class="daysep num" data-day="${d.iso}">${dayLbl(d.date)}${sc!=null?` · score ${sc}`:''}</div>`;let pt=null;
     for(const m of d.meals){const mm=toMin(m.t),k='p:'+m.id,v=sumItems(m.items);if(mm!=null&&(pt==null||mm-pt>=60))h+=`<div class="tstamp num">${esc(m.t)}</div>`;if(mm!=null)pt=mm;
       h+=`<div class="me past${z}${state.hold===k?' held':''}" data-eid="${esc(k)}"><div class="bubble" data-hold="${esc(k)}">${esc(m.text)}${rxHTML(m)}</div>${state.hold===k?holdMenu(m,true):''}</div>
-      <div class="bot past">${AV()}<div class="bot-col"><div class="card"><div class="chips">${m.items.map(pastChip).join('')}</div></div><div class="meta num">${esc(m.meal)} · ${fmt(v.kcal)} kcal${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}${tasteIcons(m)}</div></div></div>`}}
+      <div class="bot past">${AV()}<div class="bot-col"><div class="card meal"><div class="mhead"><div class="chips">${m.items.map(pastChip).join('')}</div><span class="kc num">${fmt(v.kcal)} kcal</span></div><div class="meta num">${esc(m.meal)}${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}${tasteIcons(m)}${m.t?` · ${esc(m.t)}`:''}</div></div></div></div>`}}
   return h}
 function cardMenu(pk){return `<div class="holdmenu"><div class="hmenu"><button data-pin="${pk}">${svg('pin')}${state.pinK===pk?'Unpin':'Pin to top'}</button></div></div>`}
 function renderTimeline(){
@@ -1423,9 +1450,9 @@ function renderTimeline(){
       return st+`<div class="bot ${pop}${bot()}" data-eid="${pk}">${AV()}<div class="bot-col">${body}${state.hold==='k:'+pk?cardMenu(pk):''}</div></div>`}
     const v=sumItems(e.items),[lv,head,tail]=comment(e,t,gp);me();
     return st+`<div class="me ${pop}${zt}${state.hold===e.id?' held':''}${state.target===e.id?' aimed':''}" data-eid="m:${e.id}"><div class="bubble" data-hold="${e.id}">${esc(e.text)}${rxHTML(e)}</div>${state.hold===e.id?holdMenu(e,false):''}</div>
-    <div class="bot ${pop}${bot()}">${AV()}<div class="bot-col"><div class="card"><div class="chips">${e.items.map((it,i)=>chipHTML('e:'+e.id+':'+i,it)).join('')}</div>${ibarFor('e:'+e.id+':',e.items)}${partsHTML(e.items)}${plateHTML(e.items)}
-      <div class="says ${lv}"><b>${head}</b> · ${tail}</div></div>
-      <div class="meta num"><button class="mealbtn" data-mealof="${e.id}">${e.date?'<span class="lf">Yesterday</span><span class="ls">Yest.</span> · ':''}${e.meal} ▾</button> · ${fmt(v.kcal)} kcal${v.caffeine_mg>0?`<span class="mx-caf"> · <span class="lf">caffeine</span><span class="ls">caf.</span> ${fmt(v.caffeine_mg)} mg</span>`:''}${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}${tasteIcons(e)}</div>${state.mealPick===e.id?`<div class="mealrow">${MEALS.map(m=>`<button data-setmeal="${e.id}|${m}" aria-pressed="${e.meal===m}">${m}</button>`).join('')}<button class="del" data-delmeal="${e.id}">${svg('trash',13)}Delete</button></div>`:''}</div></div>`;
+    <div class="bot ${pop}${bot()}">${AV()}<div class="bot-col"><div class="card meal" data-card="e:${e.id}"><div class="mhead"><div class="chips">${e.items.map((it,i)=>chipHTML('e:'+e.id+':'+i,it)).join('')}</div><span class="kc num">${fmt(v.kcal)} kcal</span></div>${partsHTML(e.items)}
+      <div class="says ${lv}"><b>${head}</b> · ${tail}</div>
+      <div class="meta num"><button class="mealbtn" data-mealof="${e.id}">${e.date?'<span class="lf">Yesterday</span><span class="ls">Yest.</span> · ':''}${e.meal} ▾</button>${v.caffeine_mg>0?`<span class="mx-caf"> · <span class="lf">caffeine</span><span class="ls">caf.</span> ${fmt(v.caffeine_mg)} mg</span>`:''}${v.sugar_g>=5?` · sugar ${fmt(v.sugar_g)} g`:''}${tasteIcons(e)}${e.t?` · ${esc(e.t)}`:''}</div></div>${state.mealPick===e.id?`<div class="mealrow">${MEALS.map(m=>`<button data-setmeal="${e.id}|${m}" aria-pressed="${e.meal===m}">${m}</button>`).join('')}<button class="del" data-delmeal="${e.id}">${svg('trash',13)}Delete</button></div>`:''}</div></div>`;
   }).join('')+typingHTML(prevBot);
   state.entries.forEach(e=>e.fresh=false);fitMeta();renderPin();if(state.hold)$('#toBottom').hidden=true;
   if(LIVE)schedulePersist();
@@ -1458,7 +1485,7 @@ function renderQ(){
     Q.map(([k,l])=>`<button class="qchip" data-q="${k}">${svg('spark',13)}${l}</button>`).join('');
 }
 let autoAt=0;
-function renderAll(scroll=true){renderHero();renderTimeline();renderTray();renderQ();renderEditbar();if(scroll){const sc=$('#scrToday');autoAt=Date.now();sc.scrollTop=sc.scrollHeight}}
+function renderAll(scroll=true){renderHero();renderTimeline();renderTray();renderQ();renderEditbar();renderPickSheet();if(scroll){const sc=$('#scrToday');autoAt=Date.now();sc.scrollTop=sc.scrollHeight}}
 
 /* ---------- actions ---------- */
 let seq=0;const nid=()=>'e'+(++seq);
@@ -1528,10 +1555,10 @@ $('#composer').addEventListener('submit',ev=>{ev.preventDefault();const v=$('#sa
   lookupUnknown(e);
   state.undo=()=>{state.entries=state.entries.filter(x=>x!==e)};renderAll();
   showToast('Saved · '+e.items.map(it=>it.fid?shortName(FOOD[it.fid]):it.name).join(', '))});
-/* Món không có trong từ điển → tự chọn món gần nhất (có chữ chung), để dấu ? nhỏ cho sửa sau. */
+/* Món không có trong từ điển → tự chọn món gần nhất (có chữ chung), hiện như món thường, sai thì chạm chip sửa (D62). */
 function autoGuess(it){if(it.fid||!it.name)return it;const q=norm(it.name),w=q.split(' ').filter(x=>x.length>1);if(w.length<2&&q.length<5)return it;
   const c=nearest(q,3).find(f=>f.al.concat([norm(shortName(f))]).some(a=>w.some(x=>(' '+a+' ').includes(' '+x+' '))));
-  return c?withParts({...it,fid:c.id,guess:true}):it}
+  return c?withParts({...it,fid:c.id}):it}
 /* Thói quen chỉ ghi nhận khi card đã "ổn định" (lúc nhập món tiếp theo), để tính cả các lần sửa sau khi lưu. */
 function addFoodLive(o){if(!o||!o.id)return null;if(FOOD[o.id])return FOOD[o.id];
   const L=v=>Array.isArray(v)?v:String(v||'').split('|').map(x=>x.trim()).filter(Boolean),f={};
@@ -1540,8 +1567,8 @@ function addFoodLive(o){if(!o||!o.id)return null;if(FOOD[o.id])return FOOD[o.id]
 async function lookupUnknown(e){if(!LIVE)return;
   for(const it of e.items){if(it.fid||it.kept||!it.name||it.looking)continue;it.looking=true;renderAll(false);
     try{const j=await api('estimateFood',{name:it.name},170000),f=addFoodLive(j.food);
-      if(f&&e.items.includes(it)){const nw=withParts({fid:f.id,qty:it.qty,size:it.size||'M',guess:true,name:it.name});delete it.looking;Object.assign(it,nw);
-        renderAll(false);showToast(`Gemini estimated “${shortName(f)}” · tap ? to confirm`,false)}}
+      if(f&&e.items.includes(it)){const nw=withParts({fid:f.id,qty:it.qty,size:it.size||'M'});delete it.looking;delete it.name;Object.assign(it,nw);
+        renderAll(false);showToast(`Gemini estimated “${shortName(f)}” · tap to change`,false)}}
     catch(err){delete it.looking;renderAll(false);showToast(`Couldn't estimate “${it.name}” — ${err.message}`,false)}}}
 function addToHist(e){const t=yday().getTime();let d=HIST.find(h=>h.date.getTime()===t);
   if(!d){d={date:yday(),items:[],water:0};HIST.push(d);HIST.sort((a,b)=>a.date-b.date)}
@@ -1580,7 +1607,7 @@ function renderTray(){
   const v=sumItems(d.items),unsure=d.items.some(i=>!i.fid||i.guess);
   el.hidden=false;el.innerHTML=`<div class="tray-h"><span class="eyebrow">Preview</span>
       <div class="mealpick">${MEALS.map(m=>`<button data-meal="${m}" aria-pressed="${d.meal===m}">${m}</button>`).join('')}</div></div>
-    <div class="chips">${d.items.map((it,i)=>chipHTML('d:'+i,it)).join('')}</div>${ibarFor('d:',d.items)}
+    <div class="chips">${d.items.map((it,i)=>chipHTML('d:'+i,it)).join('')}</div>
     <div class="tray-f"><span class="foods num">${d.items.length} items · ≈ ${fmt(v.kcal)} kcal${unsure?' · <b style="color:var(--amber)">needs confirmation</b>':''}${d.items.some(i=>i.habit)?' · from habit':''}</span>
       <span class="tray-b"><button class="btn-s ghost" data-cancel="1">Cancel</button><button class="btn-s" data-save="1">Save</button></span></div>`;
 }
@@ -1651,12 +1678,17 @@ $('#timeline').addEventListener('click',ev=>{
   if(ev.target.closest('[data-water]')){openWater();return}
   const sm=ev.target.closest('[data-setmeal]');if(sm){const [id,m]=sm.dataset.setmeal.split('|'),e=state.entries.find(x=>x.id===id);if(e)e.meal=m;state.mealPick=null;renderTimeline();return}
   const ib=ev.target.closest('[data-ib]');if(ib){ibTap(ib);return}
-  const c=ev.target.closest('.chip[data-ref]');if(c)chipTap(c.dataset.ref);
+  const c=ev.target.closest('.chip[data-ref]');if(c){chipTap(c.dataset.ref);return}
+  // Chạm chỗ trống trên thẻ bữa → mở bảng sửa món đầu tiên; thẻ nhiều món thì đổi món ở hàng nút trên cùng bảng (D66)
+  const cd=ev.target.closest('.card[data-card]');if(cd&&!ev.target.closest('button,a,input'))chipTap(cd.dataset.card+':0');
 });
 
 /* sheets */
-function openSheet(html){$('#toast').classList.remove('show');const s=$('#sheet');s.innerHTML='<div class="grab"></div>'+html;$('#scrim').hidden=false;requestAnimationFrame(()=>{$('#scrim').classList.add('show');s.classList.add('show')})}
-function closeSheet(){$('#scrim').classList.remove('show');$('#sheet').classList.remove('show');setTimeout(()=>{$('#scrim').hidden=true},250)}
+function openSheet(html){$('#toast').classList.remove('show');const s=$('#sheet');if(s.dataset.kind==='item'){state.pick=null;state.ownFor=null}delete s.dataset.kind;s.innerHTML='<div class="grab"></div>'+html;$('#scrim').hidden=false;requestAnimationFrame(()=>{$('#scrim').classList.add('show');s.classList.add('show')})}
+function closeSheet(){const s=$('#sheet'),wasItem=s.dataset.kind==='item';delete s.dataset.kind;
+  $('#scrim').classList.remove('show');s.classList.remove('show');setTimeout(()=>{$('#scrim').hidden=true},250);
+  // Đóng bảng sửa món (chạm nền mờ hoặc Done) → bỏ chọn chip
+  if(wasItem&&state.pick){state.pick=null;state.ownFor=null;renderAll(false)}}
 $('#scrim').addEventListener('click',closeSheet);
 function refGet(ref){const p=ref.split(':');if(p[0]==='d')return {list:state.draft.items,i:+p[1]};
   const e=state.entries.find(x=>x.id===p[1]);return {list:e.items,i:+p[2],e}}
@@ -1684,23 +1716,39 @@ const QUICK={
 };
 function quickFor(it){const f=FOOD[it.fid],have=new Set((it.parts||[{fid:it.fid,on:true}]).filter(p=>p.on).map(p=>p.fid));
   const list=QUICK[f.id]||(isDrink(f)&&f.category!=='sua'?QUICK.drink:QUICK[f.category])||[];return list.filter(id=>has(id)&&!have.has(id)).slice(0,6)}
-function ibarFor(prefix,items){const p=state.pick;if(!p||!p.startsWith(prefix))return '';const it=items[+p.slice(prefix.length)];return !it?'':it.guess||!it.fid?guessBar(p,it):ibarHTML(p,it)}
+/* Sửa món (D64): chạm chip → bảng trượt từ dưới lên, thẻ bữa giữ nguyên kích thước.
+   Dùng chung cho món ăn, đồ uống và bảng chọn lại món khi app chưa biết món. Mỗi lần renderAll thì vẽ lại nội dung, giữ vị trí cuộn. */
+function pickSheetHTML(){const p=state.pick;if(!p)return '';let r;try{r=refGet(p)}catch(e){return ''}const it=r&&r.list[r.i];if(!it)return '';
+  return it.guess||!it.fid?guessBar(p,it):ibarHTML(p,it)}
+function renderPickSheet(){const s=$('#sheet'),html=pickSheetHTML();
+  if(!html){if(s.dataset.kind==='item'){state.pick=null;closeSheet()}return}
+  if(s.dataset.kind==='item'&&s.classList.contains('show')){const y=s.scrollTop;s.innerHTML='<div class="grab"></div>'+html;s.scrollTop=y}
+  else{openSheet(html);s.dataset.kind='item'}
+  s.onclick=ev=>{if(ev.target.closest('[data-done]')){closeSheet();return}
+    const pr=ev.target.closest('[data-pickref]');if(pr){state.pick=pr.dataset.pickref;state.ownFor=null;renderAll(false);return}const ib=ev.target.closest('[data-ib]');if(ib)ibTap(ib)}}
 function guessBar(ref,it){const nm=it.name||'',cur=it.fid?FOOD[it.fid]:null,seen=new Set(),opts=[...(cur?[cur]:[]),...nearest(norm(nm),8).filter(f=>f!==cur)].filter(f=>{const k=shortName(f);if(seen.has(k))return false;seen.add(k);return true}).slice(0,4);
-  return `<div class="ibar" data-ref="${ref}"><div class="ib-f"><span>Which dish is “${esc(nm)}”? <i>pick once, the app will remember</i></span></div>
-    <div class="ib-parts gopts">${opts.map(f=>`<button class="tag" data-ib="pick:${f.id}" aria-pressed="${f===cur}">${esc(shortName(f))}</button>`).join('')}</div>
-    <div class="ib-f"><button data-ib="keep" style="color:var(--muted)">Keep as unknown</button><button data-ib="del" style="color:var(--red)">Remove</button></div></div>`}
+  return `<div class="ibar isheet" data-ref="${ref}">${itemTabs(ref)}
+    <div class="is-h"><span class="fi q">?</span><div class="is-t"><h3 id="sheetTitle">Which dish is “${esc(nm)}”?</h3><small>Pick once, the app will remember</small></div></div>
+    <div class="is-opts">${opts.map(f=>`<button data-ib="pick:${f.id}" aria-pressed="${f===cur}"><span class="rd"></span>${nm2(f)}<small class="num">${fmt(+f.kcal||0)} kcal</small></button>`).join('')}</div>
+    <div class="is-foot"><button class="is-del" data-ib="del">${svg('trash',15)}Remove</button><button class="is-ghost" data-ib="keep">Keep as unknown</button></div></div>`}
+/* Thẻ nhiều món → hàng nút đổi món ở đầu bảng sửa */
+function itemTabs(ref){let r;try{r=refGet(ref)}catch(e){return ''}if(!r.e||r.list.length<2)return '';const pre=ref.slice(0,ref.lastIndexOf(':')+1);
+  return `<div class="btabs is-tabs">${r.list.map((x,i)=>`<button class="btab" data-pickref="${pre}${i}" aria-pressed="${i===r.i}">${esc(x.fid?shortName(FOOD[x.fid]):x.name||'?')}</button>`).join('')}</div>`}
+const nm2=f=>`<span class="nm2"><span>${esc(shortName(f))}</span>${enName(f)?`<small>${esc(enName(f))}</small>`:''}</span>`;
 function ibarHTML(ref,it){
   const f=FOOD[it.fid],v=itemVals(it),dr=isDrink(f),ps=it.parts||[],al=amtLbl(f,it);
   const vol=volOf(f),odd=oddQty(it.qty);
-  const sz=['S','M','L'].map(k=>`<button data-ib="size:${k}" aria-pressed="${it.size===k&&!odd}">${dr?k:SIZES[k].l}${vol&&!ps.length?` <small class="num">${fmt(Math.round(vol*SIZES[k].k/5)*5)} ml</small>`:''}</button>`).join('');
-  const sug=sugarAdj(f)?`<div class="ib-row"><span class="ib-l">Sugar</span><div class="ib-seg">${SUGAR_STEPS.map(x=>`<button data-ib="sugar:${x}" aria-pressed="${(it.sugar??100)===x}">${x}%</button>`).join('')}</div></div>`:'';
-  const pr=ps.length?`<div class="ib-parts">${ps.map((p,j)=>`<button class="tag${p.hid?' hid':''}" data-ib="part:${j}" aria-pressed="${p.on}">${esc(shortName(FOOD[p.fid]))}</button>`).join('')}</div>`:'';
-  return `<div class="ibar" data-ref="${ref}">
-    <div class="ib-row"><div class="ib-seg">${dr?'<span class="ib-l">Size</span>':''}${sz}</div><button class="ib-del" data-ib="del" aria-label="Delete item">${svg('trash',16)}</button></div>
+  const sz=['S','M','L'].map(k=>`<button data-ib="size:${k}" aria-pressed="${it.size===k&&!odd}">${dr?k:SIZES[k].l}${vol&&!ps.length?`<small class="num">${fmt(Math.round(vol*SIZES[k].k/5)*5)} ml</small>`:''}</button>`).join('');
+  const sug=sugarAdj(f)?`<div class="is-sec"><div class="eyebrow">Sugar</div><div class="seg s5">${SUGAR_STEPS.map(x=>`<button data-ib="sugar:${x}" aria-pressed="${(it.sugar??100)===x}">${x}%</button>`).join('')}</div></div>`:'';
+  const pr=ps.length?`<div class="is-sec"><div class="eyebrow">In this dish</div><div class="is-parts">${ps.map((p,j)=>`<button class="is-part${p.hid?' hid':''}" data-ib="part:${j}" aria-pressed="${p.on}"><span class="ck">${p.on?svg('check',12):''}</span>${nm2(FOOD[p.fid])}</button>`).join('')}</div></div>`:'';
+  return `<div class="ibar isheet" data-ref="${ref}">${itemTabs(ref)}
+    <div class="is-h"><span class="fi ${itemLevel(v)}">${svg(iconKey(f))}</span><div class="is-t"><h3 id="sheetTitle">${esc(shortName(f))}</h3>${enName(f)?`<small>${esc(enName(f))}</small>`:''}</div><b class="num">${fmt(v.kcal)} kcal</b></div>
+    <p class="sub num">${al?al+' · ':''}sodium ${fmt(v.sodium_mg)} mg · sugar ${fmt(v.sugar_g)} g${it.habit?` · <i>habit: ${esc(it.habit)}</i>`:''}</p>
+    <div class="is-sec"><div class="eyebrow">${dr?'Size':'Portion'}</div><div class="seg s3">${sz}</div></div>
     ${sug}${pr}
-    <div class="ib-quick"><span class="ib-l">Quick add</span>${quickFor(it).map(id=>`<button class="tag add" data-ib="add:${id}">+ ${esc(shortName(FOOD[id]))}</button>`).join('')}<button class="tag add own" data-ib="own">+ Add your own</button></div>
-    ${state.ownFor===ref?`<form class="ib-own" data-own="${ref}" autocomplete="off"><input id="ownIn" type="text" placeholder="e.g. trứng ốp la, chả lụa" aria-label="Ingredient or side to add" enterkeyhint="done"><button class="btn-s">Add</button></form>`:''}
-    <div class="ib-f"><span class="num">${al?al+' · ':''}${fmt(v.kcal)} kcal · sodium ${fmt(v.sodium_mg)} mg · sugar ${fmt(v.sugar_g)} g${it.habit?` · <i>habit: ${esc(it.habit)}</i>`:''}</span></div>
+    <div class="is-sec"><div class="eyebrow">Add</div><div class="is-add">${quickFor(it).map(id=>`<button data-ib="add:${id}"><b>+</b>${nm2(FOOD[id])}</button>`).join('')}<button class="own" data-ib="own">+ Something else…</button></div>
+    ${state.ownFor===ref?`<form class="ib-own" data-own="${ref}" autocomplete="off"><input id="ownIn" type="text" placeholder="e.g. trứng ốp la, chả lụa" aria-label="Ingredient or side to add" enterkeyhint="done"><button class="is-done">Add</button></form>`:''}</div>
+    <div class="is-foot"><button class="is-del" data-ib="del">${svg('trash',15)}Delete item</button><button class="is-done" data-done="1">Done</button></div>
   </div>`}
 function chipTap(ref){const r=refGet(ref),it=r.list[r.i];if(!it)return;
   state.pick=state.pick===ref?null:ref;state.ownFor=null;renderAll(false)}
